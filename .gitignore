@@ -8,3 +8,4 @@ _shots/
 _frames/
 *.tmp
 __pycache__/
+node_modules

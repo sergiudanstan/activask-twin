@@ -101,21 +101,37 @@ function checkObject(o) {
   return errs;
 }
 
-// Places a scene's objects on the table without overlap, inside the robot's reachable band, deterministically.
+// Discs [x, y, r] covering an object's footprint at pose (x, y, yaw): one disc for cups and bottles (handle included),
+// a chain of discs for forks and spoons, whose length runs along the object's local x axis (yaw 0 = along cell x).
+function footprintDiscs(o, x, y, yaw) {
+  const d = dimsOf(o);
+  if (o.cat === "cup" || o.cat === "bottle") return [[x, y, d.d / 2 + (o.handle ? 0.02 : 0)]];
+  const r = d.w / 2 + 0.004, n = Math.ceil(d.l / (2 * r)) + 1, c = Math.cos(yaw), s = Math.sin(yaw);
+  return Array.from({ length: n }, (_, i) => { const t = -d.l / 2 + r + ((d.l - 2 * r) * i) / (n - 1); return [x + c * t, y + s * t, r]; });
+}
+const LAYOUT_GAP = 0.03;   // clear space between objects (m), so the gripper fingers fit
+// Places a scene's objects on the table inside the robot's working band, without overlap, deterministically.
+// Restarts the whole scene when an object finds no room.
 function layoutScene(scene, seed = 1) {
-  const r = rng(seed), placed = [];
-  const xMax = TABLE.w / 2 - TABLE.margin, yMin = -TABLE.d / 2 + TABLE.margin + 0.04, yMax = yMin + 0.34;
-  for (const o of scene.objects) {
-    const rad = footprint(o);
-    let ok = false;
-    for (let k = 0; k < 400 && !ok; k++) {
-      const x = lerp(-xMax + rad, xMax - rad, r()), y = lerp(yMin + rad, yMax - rad, r());
-      ok = placed.every((p) => Math.hypot(p.x - x, p.y - y) > p.rad + rad + 0.03);
-      if (ok) placed.push({ ...o, x, y, yaw: (r() - 0.5) * Math.PI, rad });
+  const r = rng(seed);
+  const x0 = -TABLE.w / 2 + TABLE.margin, x1 = TABLE.w / 2 - TABLE.margin;
+  const y0 = -TABLE.d / 2 + TABLE.margin, y1 = y0 + 0.42;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const placed = [];
+    for (const o of scene.objects) {
+      let done = false;
+      for (let k = 0; k < 300 && !done; k++) {
+        const x = lerp(x0, x1, r()), y = lerp(y0, y1, r()), yaw = (r() - 0.5) * Math.PI;
+        const discs = footprintDiscs(o, x, y, yaw);
+        const inside = discs.every(([u, v, q]) => u - q >= x0 && u + q <= x1 && v - q >= y0 && v + q <= y1);
+        const free = inside && placed.every((p) => p.discs.every(([u, v, q]) => discs.every(([u2, v2, q2]) => Math.hypot(u - u2, v - v2) > q + q2 + LAYOUT_GAP)));
+        if (free) { placed.push({ o: { ...o, x, y, yaw }, discs }); done = true; }
+      }
+      if (!done) break;
     }
-    if (!ok) throw new Error(`layoutScene: no room for ${o.id} in ${scene.id}`);
+    if (placed.length === scene.objects.length) return { ...scene, objects: placed.map((p) => p.o) };
   }
-  return { ...scene, objects: placed.map(({ rad, ...o }) => o) };
+  throw new Error(`layoutScene: no room for the objects of ${scene.id}`);
 }
 
 // ---------------------------------------------------------------- policies (Table 3)
@@ -130,4 +146,4 @@ const POLICIES = Object.freeze([
 ]);
 
 Object.assign(LOGIC, { clamp, lerp, ease, rng, pick, PARAMS, CATEGORIES, FAMILIES, INSTR_TYPES, ATTRS, DIMS, BOOL_ATTRS,
-  TABLE, CAM, ROBOT, CAM_POSE, camProject, POLICIES, dimsOf, footprint, checkObject, layoutScene });
+  TABLE, CAM, ROBOT, CAM_POSE, camProject, POLICIES, dimsOf, footprint, footprintDiscs, checkObject, layoutScene });

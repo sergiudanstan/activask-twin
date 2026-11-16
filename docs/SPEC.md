@@ -18,7 +18,10 @@ present a twin number as the paper's. Facts that are not in the paper or in a ci
 - Metres, radians, seconds. **Cell frame**: z up, origin on the floor under the table-top centre, x along the
   table (left to right as the head camera sees it), y away from the robot. three.js gets it through
   `world` (rotated −90° about x): cell (x, y, z) → scene (x, z, −y). Camera views use `cv()` (`50-views.js`).
-- Table: `TABLE` (1.20 × 0.70 m, top at z = 0.74). Objects stand on the top, positions from `layoutScene`.
+- Table: `TABLE` (1.20 × 0.70 m, top at z = 0.74). Objects stand on the top, positions from `layoutScene`
+  (footprints from `footprintDiscs`). A fork or spoon lies flat with its **length along its local x axis**
+  (yaw 0 = along cell x, tines/bowl toward +x); cups and bottles are round about their local z axis, a cup's
+  handle points along local +x.
 - Robot: `ROBOT.base` on the −y side. It drives along x, the telescoping arm extends along +y over the table.
 - Head camera: `CAM` (640 × 360, 69° × 42°, D435i colour FOV) at `CAM_POSE` (position + look-at point);
   `camProject(p)` is the pinhole projection to pixels. Perception boxes and the rendered head view must agree.

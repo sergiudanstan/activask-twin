@@ -20,8 +20,9 @@ export default function (L, check) {
   const a = L.layoutScene(scene, 3), b = L.layoutScene(scene, 3);
   check(JSON.stringify(a) === JSON.stringify(b), "layoutScene is deterministic");
   const T = L.TABLE, objs = a.objects;
-  const inside = objs.every((o) => Math.abs(o.x) + L.footprint(o) <= T.w / 2 && Math.abs(o.y) + L.footprint(o) <= T.d / 2);
-  const apart = objs.every((o, i) => objs.every((p, j) => i >= j || Math.hypot(o.x - p.x, o.y - p.y) > L.footprint(o) + L.footprint(p)));
+  const discs = objs.map((o) => L.footprintDiscs(o, o.x, o.y, o.yaw));
+  const inside = discs.flat().every(([u, v, q]) => Math.abs(u) + q <= T.w / 2 && Math.abs(v) + q <= T.d / 2);
+  const apart = discs.every((A, i) => discs.every((B, j) => i >= j || A.every(([u, v, q]) => B.every(([u2, v2, q2]) => Math.hypot(u - u2, v - v2) > q + q2))));
   check(inside && apart, "layoutScene keeps 8 cups on the table without overlap");
   // camera: the look point projects to the image centre; every laid-out object is inside the image
   const c = L.camProject(L.CAM_POSE.look);
@@ -35,5 +36,5 @@ export const perturbations = [
   { name: "box threshold 0.38 -> 0.50", find: "tau: 0.38,", replace: "tau: 0.50," },
   { name: "ideal |S0|=5 reference 2.400 -> 2.500", find: "5: { ideal: 2.400", replace: "5: { ideal: 2.500" },
   { name: "camera right vector flipped", find: "let rx = fy, ry = -fx", replace: "let rx = -fy, ry = fx" },
-  { name: "layout gap removed (objects may touch)", find: "> p.rad + rad + 0.03", replace: "> 0" },
+  { name: "layout overlap test removed", find: "> q + q2 + LAYOUT_GAP", replace: "> -1" },
 ];

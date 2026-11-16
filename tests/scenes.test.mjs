@@ -63,6 +63,17 @@ export default function (L, check) {
   const texts = new Set(off.flatMap((s) => (I[s.id] || []).map((x) => x.text)));
   check(texts.size >= 150, `>= 150 different instruction texts offline (got ${texts.size})`);
   check(Object.keys(I).every((id) => S.some((s) => s.id === id)), "no instruction pool for an unknown scene");
+  // every scene lays out on the table (seeds 1..3), objects apart and inside the head-camera image
+  const lay = [];
+  for (const s of S) for (const seed of [1, 2, 3]) {
+    let sc; try { sc = L.layoutScene(s, seed); } catch (e) { lay.push(`${s.id}#${seed}: ${e.message}`); continue; }
+    const ds = sc.objects.map((o) => L.footprintDiscs(o, o.x, o.y, o.yaw));
+    const overlap = ds.some((A, i) => ds.some((B, j) => i < j && A.some(([u, v, q]) => B.some(([u2, v2, q2]) => Math.hypot(u - u2, v - v2) <= q + q2))));
+    const offImg = sc.objects.filter((o) => { const p = L.camProject([o.x, o.y, L.TABLE.h]); return !p || p[0] < 0 || p[0] > L.CAM.w || p[1] < 0 || p[1] > L.CAM.h; });
+    if (overlap) lay.push(`${s.id}#${seed}: overlap`);
+    if (offImg.length) lay.push(`${s.id}#${seed}: ${offImg.map((o) => o.id)} outside the camera image`);
+  }
+  check(lay.length === 0, `all 56 scenes lay out (3 seeds), no overlap, every object in the head-camera image${lay.length ? ": " + lay.slice(0, 4).join("; ") : ""}`);
 }
 export const perturbations = [
   { name: "an online scene relabelled offline", find: 'set: "online"', replace: 'set: "offline"' },

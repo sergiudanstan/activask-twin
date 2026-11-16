@@ -8,8 +8,8 @@ merges into `main`, pushes, and sends prompts. Workers commit only on `feat/<nam
 |---|---|---|---|---|
 | M0 scaffold + contracts | shell, 10, 12, 19, tests harness, tools | Claude | main | done |
 | scene (M1) | 16 (specs), 25, 26, 40 | Grok `wX:p2` | feat/scene | dispatched |
-| reasoning (M2+M3) | 13, 14 | Codex `wX:p3` | feat/reasoning | dispatched |
-| scenes data (M6) | 11 | OpenCode `wX:p4` | feat/scenes | dispatched |
+| reasoning (M2+M3) | 13, 14 | Grok `wX:p5` (moved from Codex: sandbox read-only outside its cwd, weekly limit 1 %) | feat/reasoning | dispatched |
+| scenes data (M6) | 11 | OpenCode `wX:p4` | feat/scenes | merged (d6a3176): 56 scenes, 336 instructions, 189 unique offline texts |
 | grasp (M4) | 16 (IK), 41 | Grok | feat/grasp | after scene |
-| experiments (M5) | 15 | Codex | feat/experiments | after reasoning + scenes |
+| experiments (M5) | 15 | Grok | feat/experiments | after reasoning |
 | integration + deploy (M7) | 60, 70, page | Claude | main | last |
