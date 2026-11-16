@@ -18,6 +18,5 @@ merges into `main`, pushes, and sends prompts. Workers commit only on `feat/<nam
 | docs | README, FIDELITY | Grok `wX:p5` | merged |
 | integration + deploy | 20, 66 fixes, Pages | Claude | live: 01e1f0f |
 
-Open: lateral clearance margin in the grasp corridor test (contacts of 0.5-2 mm allowed); FIDELITY.md line
-references not re-verified after the r1 merges; README screenshot marker empty; the grasp r1 visual re-check did not
+Open: lateral clearance margin in the grasp corridor test (contacts of 0.5-2 mm allowed); FIDELITY.md: all 67 file:line references verified on 01e1f0f; README screenshot marker empty; the grasp r1 visual re-check did not
 run (Claude usage limit), only the kinematic one.
