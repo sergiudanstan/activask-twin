@@ -7,6 +7,7 @@ renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.info.autoReset = false;   // the loop resets once per frame, so renderInfo() counts every pass
 renderer.domElement.classList.add("main");
 viewport.prepend(renderer.domElement);
 

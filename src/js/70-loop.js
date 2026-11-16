@@ -3,6 +3,14 @@
 // (t) => void onto TICKERS; everything on screen is a pure function of t.
 let SEGS = [], DURATION = 10;
 const TICKERS = [];
+// CHECKS: modules push { name, run: () => ({ ok, detail }) }; window.pc.checks() runs them (tools/shots.mjs reports them).
+const CHECKS = [];
+// Replaces the timeline. Call it after load (e.g. from queueMicrotask), never during module evaluation.
+function setTimeline(segs, duration) {
+  SEGS = segs;
+  DURATION = Math.max(0.1, duration ?? segs.reduce((m, s) => Math.max(m, s.t1), 0));
+  time = Math.min(time, DURATION);
+}
 let time = 0, playing = false, speed = 1;
 const playIcon = $("play-icon");
 function setPlaying(on) {
@@ -47,6 +55,7 @@ function frame(now) {
   for (const f of TICKERS) f(time);
   $("clock-now").textContent = time.toFixed(1); $("clock-total").textContent = DURATION.toFixed(1);
   $("playhead").style.left = `${(time / DURATION) * 100}%`;
+  renderer.info.reset();
   renderFrame();
   window.pcReady = true;
   requestAnimationFrame(frame);
@@ -61,8 +70,11 @@ window.pc = {
   },
   get DURATION() { return DURATION; },
   views: Object.keys(views),
-  renderInfo: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
-  checks: () => ({ ok: true }),
+  renderInfo: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),   // whole last frame (shadows + passes)
+  checks: () => {
+    const results = CHECKS.map((c) => { try { return { name: c.name, ...c.run() }; } catch (e) { return { name: c.name, ok: false, detail: String(e) }; } });
+    return { ok: results.every((r) => r.ok), results };
+  },
 };
 applyTheme();
 window.addEventListener("themechange", applyTheme);
