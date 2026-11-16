@@ -64,35 +64,45 @@ Keys, when the focus is not in a field: **Space** plays and pauses. **1** Room, 
 waypoint sequence). This page does not read `demo`. `planGrasp` and `graspWaypoints` are not in the tree yet.
 
 The Experiments panel has set, seed, ε, K and slip, **Run batch**, and **Copy batch CSV**. The seed box runs
-one batch and draws it as detail. The Paper panel's twin column is the five-seed headline and stays put when
-you run another seed. Headline protocol: seeds 1–5, ε = 0, K = 4, slip = 0.05.
+one batch and draws it as detail. The Paper-vs-twin header states that the twin column is the 5-seed mean
+of 216 trials per policy per seed. That column stays put when you run another seed. Headline protocol:
+seeds 1–5, ε = 0, K = 4, slip = 0.05.
 
 ## Results
 
-Twin cells are the unweighted mean of seeds 1, 2, 3, 4 and 5. Each offline seed is 216 trials per policy
-(1512 trials). Each online seed is 57 trials per policy on the four online policies. ε = 0, K = 4,
-slip = 0.05, except the noise sweep and the K sweep, which vary that one factor. Percentages and question
-counts are rounded to two decimals; expected free energy is rounded to three. The five offline batches took
-0.17 s in Node.
+Twin cells are the unweighted mean of seeds 1, 2, 3, 4 and 5. Each offline seed is 216 trials per policy,
+so the offline twin column is the 5-seed mean of 216 trials per policy per seed (1512 trials a policy).
+Each online seed is 57 trials per policy on the four online policies. ε = 0, K = 4, slip = 0.05, except the
+noise sweep and the K sweep, which vary that one factor. Percentages and question counts are rounded to two
+decimals; expected free energy is rounded to three. The five offline batches took 0.17 s in Node.
 
 Slip is the probability that a proposed question is damaged (a candidate dropped, duplicated, or an id leaked
-into the text) and then repaired. It is a twin assumption (`docs/SPEC.md` §3.2).
+into the text) and then repaired. Each proposal keeps `raw`, the four validity flags from before that repair,
+and `valid`, the flags after it. They are equal when slip does not fire. `repaired` and `fallback` record
+which rewrite ran. Slip 0.05 is a twin assumption (`docs/SPEC.md` §3.2).
 
 ### Calibrated
 
-The detector score bands were fitted so that these rows match the paper. Agreement here is by construction.
-The asked rates are for the four clarifying policies. The paper's published asked-by-type figures pool all
-seven methods, and the three policies that never ask pull them down, so the paper column is the published
-rate × 7/4 (clear 1.79 → 3.13, partial 26.64 → 46.62, ambiguous 52.37 → 91.65). The fit target in
-`src/js/13-perception.js` is about 3 / 47 / 92.
+The detector score bands were fitted to mean \|S0\| and the multi-candidate rate. Agreement on those two
+rows is by construction.
 
 | Row | Paper | Twin mean | |
 |---|---:|---:|---|
 | Mean \|S0\| | 2.49 | 2.48 | calibrated |
 | Multi-candidate rate | 46.10% | 46.57% | calibrated |
-| Asked rate, clear | 3.13% | 2.22% | calibrated |
-| Asked rate, partial | 46.62% | 47.78% | calibrated |
-| Asked rate, ambiguous | 91.65% | 89.72% | calibrated |
+
+The asked rates below are the four clarifying policies. The paper column is derived, not the published cell:
+the published pooled rate (all seven methods) times 7/4, because the three policies that never ask pull the
+pooled rate down. Clear 1.79 × 7/4 = 3.13, partial 26.64 × 7/4 = 46.62, ambiguous 52.37 × 7/4 = 91.65.
+The fit target in `src/js/13-perception.js` is about 3 / 47 / 92. The twin values are the five-seed means.
+Clear is 2.22 against the derived 3.13, a residual of −0.91 points, 29% low. That is not agreement.
+Partial is +1.16 points. Ambiguous is −1.93 points.
+
+| Row | Derived paper (pooled × 7/4) | Twin mean | |
+|---|---:|---:|---|
+| Asked rate, clear | 3.13 (1.79 × 7/4) | 2.22 | fitted, −0.91 pt, 29% low, not agreement |
+| Asked rate, partial | 46.62 (26.64 × 7/4) | 47.78 | fitted, +1.16 pt |
+| Asked rate, ambiguous | 91.65 (52.37 × 7/4) | 89.72 | fitted, −1.93 pt |
 
 ### Offline policies (out of sample)
 
@@ -115,7 +125,7 @@ policies have identical accuracy and asked rate by construction; only their ques
 ### Instruction type (out of sample)
 
 Paper Sec. 5.1, all methods pooled. The twin column pools the same seven policies, then averages the five
-seeds. Asked rate by type is the calibrated table above; this table is accuracy and questions on asked trials.
+seeds. Asked rate by type is the fitted table above, with its residual; this table is accuracy and questions on asked trials.
 
 | Type | Paper acc % | Twin acc % | Paper Q asked | Twin Q asked |
 |---|---:|---:|---:|---:|
@@ -180,23 +190,25 @@ draw; that made K irrelevant and has been removed (`src/js/14-clarify.js`).
 | 4 | −0.669 | −0.678 | −0.675 | −0.692 | 8.37 |
 | 5 | −0.670 | −0.680 | −0.681 | −0.692 | 10.42 |
 
-### Online (out of sample)
+### Online
 
 Twenty scenes, 57 trials per policy (19 of each instruction type), policies Top score, Random, VLM question
-and ActivAsk. Target accuracy is whether the dialogue names the intended object. Grasp is the success rate on
-executed attempts. Full task is grasp success over all 57 trials. Attempts and not-executed are counts; the
-twin cells are means of those counts.
+and ActivAsk. Target accuracy is whether the dialogue names the intended object, and it is out of sample.
+Grasp % and full-task % are sampled from the paper's category rates (not out-of-sample): an executed attempt
+succeeds when a uniform draw falls under `PAPER.graspByCat` for that object's category, keyed by the trial
+seed rather than by the policy. Full task is that success over all 57 trials, so it inherits the same draw.
+Attempts and not-executed are twin counts. The twin cells are means over the five seeds.
 
 | | Top score | Random | VLM question | ActivAsk |
 |---|---:|---:|---:|---:|
 | Paper target % | 59.65 (46.70–71.38) | 61.40 (48.43–72.94) | 91.23 (81.06–96.19) | 92.98 (83.30–97.24) |
-| Twin target % | 59.65 | 55.44 | 88.07 | 88.07 |
+| Twin target % (out of sample) | 59.65 | 55.44 | 88.07 | 88.07 |
 | Paper attempts | 34 | 35 | 52 | 53 |
 | Twin attempts | 34.0 | 31.6 | 50.2 | 50.2 |
 | Paper grasp % | 88.24 (73.38–95.33) | 82.86 (67.32–91.90) | 88.46 (77.03–94.60) | 94.34 (84.63–98.06) |
-| Twin grasp % | 90.71 | 91.63 | 90.86 | 90.86 |
+| Twin grasp % (sampled from the paper's category rates, not out-of-sample) | 90.71 | 91.63 | 90.86 | 90.86 |
 | Paper full task % | 52.63 (39.92–65.01) | 50.88 (38.26–63.38) | 80.70 (68.66–88.87) | 87.72 (76.75–93.92) |
-| Twin full task % | 54.04 | 50.88 | 80.00 | 80.00 |
+| Twin full task % (sampled from the paper's category rates, not out-of-sample) | 54.04 | 50.88 | 80.00 | 80.00 |
 | Paper not executed | 23 | 22 | 5 | 4 |
 | Twin not executed | 23.0 | 25.4 | 6.8 | 6.8 |
 | Paper Q asked | – | – | 2.25 | 1.84 |
@@ -208,8 +220,9 @@ question counts still differ. Which numbers sit close to the paper, and which do
 
 ## Limitations
 
-Perception is a scored stand-in for GroundingDINO, not the detector. The three calibrated rows are the
-quantities the bands were fitted to.
+Perception is a scored stand-in for GroundingDINO, not the detector. Mean \|S0\| and the multi-candidate
+rate are the rows the bands were fitted to. The clarifying asked rate by type was a fit target; clear
+misses the derived rate by 0.91 points.
 
 Questions are enumerated from visible attributes and drawn uniformly. Direct VLM and the VLM-selected question
 are salience rules. The paper's picks come from MiMo-VL-7B.
@@ -218,7 +231,8 @@ The batch is paired, so the clarifying policies cannot reproduce the small accur
 Table 5.
 
 Grasp contact is not simulated. An executed attempt succeeds with the paper's rate for that category
-(cup 96.61%, bottle 85.25%, fork 80.77%, spoon 89.29%).
+(cup 96.61%, bottle 85.25%, fork 80.77%, spoon 89.29%). Grasp % and full-task % are sampled from those
+rates. They are not an out-of-sample prediction of the paper's per-policy grasp column.
 
 ## Development
 

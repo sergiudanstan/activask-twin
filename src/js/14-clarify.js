@@ -118,15 +118,29 @@ function efe(p, S) {
   return G;
 }
 
+function clFlagCopy(v) {
+  return {
+    exhaustive: !!(v && v.exhaustive),
+    disjoint: !!(v && v.disjoint),
+    legal: !!(v && v.legal),
+    wording: !!(v && v.wording),
+  };
+}
+
+// valid is the proposal after repair. raw is the four flags of the text and branches the
+// simulated VLM produced, before that repair, and equals valid when nothing was damaged.
 function clAnnotate(p, S, scene) {
   const yes = p.yes.slice(), no = p.no.slice();
   const prop = {
     text: p.text, yes, no, key: p.key,
     count: { total: S.length, yes: yes.length, no: no.length },
     valid: { exhaustive: false, disjoint: false, legal: false, wording: false },
+    raw: { exhaustive: false, disjoint: false, legal: false, wording: false },
+    repaired: false, fallback: false,
     G: 0, vlmPick: false,
   };
   prop.valid = validateProp(prop, S);
+  prop.raw = clFlagCopy(prop.valid);
   prop.G = efe(prop, S);
   if (scene) clPropScene.set(prop, scene);
   return prop;
@@ -280,6 +294,7 @@ function clSlip(p, S, r) {
 // side?") is reworded relative to the remaining candidates ("Of the ones left, ..."), so the dialogue never
 // repeats a question (Sec. 3.4.1: dialogue history avoids repeating answered questions).
 // slip (default 0 here; runTrial defaults to 0.05) drops a candidate, duplicates one, or leaks an id, then repairs.
+// raw keeps the four flags from before that repair. repaired and fallback say which rewrite ran.
 function proposeQuestions(S, cands, scene, history, opts) {
   const opt = opts || {};
   const K = opt.K == null ? PARAMS.K : opt.K;
@@ -293,11 +308,21 @@ function proposeQuestions(S, cands, scene, history, opts) {
   const r = rng((seed >>> 0) || 1);
   const chosen = clSample(pool, K, r);
   const built = [];
-  for (const raw of chosen) {
-    const damaged = slip > 0 && r() < slip ? clSlip(raw, S, r) : raw;
+  for (const drawn of chosen) {
+    const damaged = slip > 0 && r() < slip ? clSlip(drawn, S, r) : drawn;
     const flags = validateProp(damaged, S);
-    if (clFlagsOk(flags)) built.push(clAnnotate(damaged, S, scene));
-    else built.push(repairProp(damaged, S, cands, scene) || fallbackProp(S, cands, scene));
+    let prop;
+    if (clFlagsOk(flags)) prop = clAnnotate(damaged, S, scene);
+    else {
+      prop = repairProp(damaged, S, cands, scene);
+      if (prop) prop.repaired = true;
+      else {
+        prop = fallbackProp(S, cands, scene);
+        prop.fallback = true;
+      }
+      prop.raw = { exhaustive: flags.exhaustive, disjoint: flags.disjoint, legal: flags.legal, wording: flags.wording };
+    }
+    built.push(prop);
   }
   for (const p of built) if (hist.has(p.text)) p.text = "Of the ones left, " + p.text.charAt(0).toLowerCase() + p.text.slice(1);
   const fresh = built.filter((p) => !hist.has(p.text));

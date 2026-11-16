@@ -31,41 +31,45 @@ operator's ground truth: the noun category, then every modifier.
 
 Validation, Eq. 3, `validateProp` in `src/js/14-clarify.js:87-102`. Exhaustive: yes ∪ no = S. Disjoint: no id
 repeated. Legal: no id from outside S. Wording (`src/js/14-clarify.js:21-29`): the text has no digit and no
-mention of score, IoU, threshold, box, pixel, candidate or id. The four flags are stored on the proposal.
+mention of score, IoU, threshold, box, pixel, candidate or id. `valid` stores those four flags
+after repair. `raw` stores the same four flags on the proposal the simulated VLM produced, before
+repair, and equals `valid` when nothing was damaged (`src/js/14-clarify.js:130-143` and `:323`).
+`repaired` and `fallback` (`src/js/14-clarify.js:318-321`) say which rewrite ran.
 
 Expected free energy, Eq. 11, uniform belief, `efe` in `src/js/14-clarify.js:106-119`.
 p_yes = \|Y\|/\|S\|, p_no = \|N\|/\|S\|, G = p_yes·ln p_yes + p_no·ln p_no, natural log, zero-mass terms
 omitted. Lower is better. A 2\|2 split of 4 has G = −ln 2.
 
-Update, Eq. 4, `updateState` in `src/js/14-clarify.js:329-334`. "Yes" keeps Y, "no" keeps N, and an id that
-was not in S is not reintroduced. The loop (`src/js/14-clarify.js:446-459`) stops at one candidate
+Update, Eq. 4, `updateState` in `src/js/14-clarify.js:354-359`. "Yes" keeps Y, "no" keeps N, and an id that
+was not in S is not reintroduced. The loop (`src/js/14-clarify.js:471-484`) stops at one candidate
 (resolved) or at an empty set or an empty proposal list (unresolved). A guard of 24 rounds
-(`src/js/14-clarify.js:446`) is a backstop; the paper's stop is the empty or singleton set.
+(`src/js/14-clarify.js:471`) is a backstop; the paper's stop is the empty or singleton set.
 
 Policies, Table 3. Names and the clarifies / offline / online flags are `src/js/10-contracts.js:138-146`.
 
-- Top score (`src/js/14-clarify.js:435-438`): highest detector score in S0, tie broken by the earlier display
+- Top score (`src/js/14-clarify.js:460-463`): highest detector score in S0, tie broken by the earlier display
   number. No question.
-- Random candidate (`src/js/14-clarify.js:430-433`): uniform draw in S0. No question.
-- First question (`src/js/14-clarify.js:361`): the first proposal in the list `proposeQuestions` returns.
-  That list is sorted by key (`src/js/14-clarify.js:305`), so "first" is the lowest key among the K that were
+- Random candidate (`src/js/14-clarify.js:456-459`): uniform draw in S0. No question.
+- First question (`src/js/14-clarify.js:386`): the first proposal in the list `proposeQuestions` returns.
+  That list is sorted by key (`src/js/14-clarify.js:330`), so "first" is the lowest key among the K that were
   drawn.
-- Random question (`src/js/14-clarify.js:362-365`): uniform among the valid proposals in that list.
-- ActivAsk (`src/js/14-clarify.js:367-371`): lowest G. A tie keeps the earlier proposal, which is key order
+- Random question (`src/js/14-clarify.js:387-390`): uniform among the valid proposals in that list.
+- ActivAsk (`src/js/14-clarify.js:392-396`): lowest G. A tie keeps the earlier proposal, which is key order
   after the sort above.
 
 Direct VLM and the VLM-selected question are the heuristics in §3, not MiMo-VL-7B.
 
-Operator, `src/js/14-clarify.js:375-381`. The answer is the key evaluated on the intended object, including
+Operator, `src/js/14-clarify.js:401-406`. The answer is the key evaluated on the intended object, including
 when perception missed that object. With probability ε the answer flips.
 
-Repair, `src/js/14-clarify.js:137-149`. When a damaged proposal still has a parsable key that splits S, the
-key rewrites the branches and the wording. Otherwise `fallbackProp` (`src/js/14-clarify.js:314-327`)
-substitutes the most balanced enumerated partition, tie broken by key order.
+Repair, `src/js/14-clarify.js:151-163`. When a damaged proposal still has a parsable key that splits S, the
+key rewrites the branches and the wording. Otherwise `fallbackProp` (`src/js/14-clarify.js:339-352`)
+substitutes the most balanced enumerated partition, tie broken by key order. The pre-repair flags stay on
+`raw` (`src/js/14-clarify.js:323`).
 
-Dialogue history, Sec. 3.4.1, `src/js/14-clarify.js:291`. A key already asked is not offered again. A new
+Dialogue history, Sec. 3.4.1, `src/js/14-clarify.js:292-306`. A key already asked is not offered again. A new
 partition whose wording was already used is prefixed "Of the ones left, "
-(`src/js/14-clarify.js:302`).
+(`src/js/14-clarify.js:327`).
 
 Protocol, Sec. 4 and Sec. 4.1, `src/js/15-experiments.js`.
 
@@ -94,9 +98,14 @@ not in this tree. `src/js/16-kinematics.js` publishes `STRETCH` only. There is n
 
 `src/js/13-perception.js:4-8` states the fit. The paper does not publish per-tier score distributions
 (TODO-SOURCE on line 4). The bands were refit on the 36 offline scenes to three targets: mean \|S0\| = 2.49,
-multi-candidate rate = 46.1%, and clarifying asked rate by type about 3% / 47% / 92%. Matching those three is
-the fit. The five-seed means on this tree are 2.476, 46.57%, and 2.22% / 47.78% / 89.72% (clear / partial /
-ambiguous).
+multi-candidate rate = 46.1%, and clarifying asked rate by type about 3% / 47% / 92%. Mean \|S0\| and the
+multi-candidate rate land on those targets: the five-seed means are 2.476 and 46.57%. The asked-rate
+targets are not the published cells. The paper pools all seven methods (clear 1.79, partial 26.64,
+ambiguous 52.37). Three methods never ask, so the clarifying equivalent is that pooled rate × 7/4:
+3.1325 / 46.62 / 91.6475. The five-seed clarifying rates are 2.222 / 47.778 / 89.722. Clear is 0.91 points
+under its derived target, about 29% low. That residual is not agreement. Partial is 1.16 points over.
+Ambiguous is 1.93 points under. The panel prints the derivation and the residual and does not say
+agreement by construction for those rows.
 
 `PER_SCORE` is `src/js/13-perception.js:28-41`. A score is uniform inside the band. Two draws are taken per
 object so the miss coin does not shift the stream (`src/js/13-perception.js:92-99`).
@@ -176,9 +185,9 @@ authors' prompts, or accepting that those phrases detect the whole category.
 `src/js/14-clarify.js:6-13` — direct pick and VLM-selected question (TODO-SOURCE). The paper uses
 MiMo-VL-7B. The twin runs no VLM. `directVLM` ranks candidates by how many instruction modifiers the object
 satisfies, then by category, then by detector score, then by earlier display number
-(`src/js/14-clarify.js:388-399`). On an ambiguous instruction that rank collapses to the top score.
+(`src/js/14-clarify.js:413-425`). On an ambiguous instruction that rank collapses to the top score.
 `vlmQ` ignores G and prefers a salient family in the order colour, handle, size, material, lid, near,
-left/right, near/far (`src/js/14-clarify.js:17` and `:345-352`). A colour question is often a 1-versus-rest
+left/right, near/far (`src/js/14-clarify.js:17` and `:370-378`). A colour question is often a 1-versus-rest
 split. Removing either heuristic means calling MiMo-VL-7B, or replaying the study's logged picks.
 
 `src/js/14-clarify.js:15-16` — "next to" (TODO-SOURCE). `CL_NEAR_M` = 0.22 m, about two cup diameters on this
@@ -186,25 +195,29 @@ table. The paper never states a distance. The predicate is true when some other 
 is within 0.22 m (`src/js/14-clarify.js:60-69`). Removing it means a distance the paper states, or dropping
 "next to" questions.
 
-`src/js/14-clarify.js:260-264` — which K questions are proposed (TODO-SOURCE). The paper says the VLM proposes
-K questions and does not say how they are spread. `clSample` (`src/js/14-clarify.js:250-258`) draws K distinct
+`src/js/14-clarify.js:274-278` — which K questions are proposed (TODO-SOURCE). The paper says the VLM proposes
+K questions and does not say how they are spread. `clSample` (`src/js/14-clarify.js:264-272`) draws K distinct
 partitions uniformly from the enumerated pool. ActivAsk then chooses only inside that K, so a larger K raises
 the chance of a balanced split (Sec. 5.3). An earlier version swapped the most balanced partition into every
 draw; that made the K sweep flat and changed ActivAsk's questions on asked trials by 0.007, and it was
 removed. Removing the remaining assumption means the VLM's own proposal distribution.
 
-`src/js/14-clarify.js:266-276` and `:416` — invalid-proposal rate. With probability `slip` (default 0.05 in
+`src/js/14-clarify.js:279-289` and `:441` — invalid-proposal rate. With probability `slip` (default 0.05 in
 `runTrial`, default 0 inside `proposeQuestions` itself) the twin drops a candidate, duplicates one, or leaks
-an id into the text, then repairs or falls back. `docs/SPEC.md` §3.2 calls 0.05 a twin assumption. The source
-comment does not use those words. Removing it means the study's rate of invalid proposals, or setting slip
-to 0 when the comparison should assume well-formed questions.
+an id into the text, then repairs or falls back. Each returned proposal keeps `raw` (the four flags before
+that repair), `valid` (the flags after it), and the booleans `repaired` and `fallback`
+(`src/js/14-clarify.js:311-323`). With slip 0, `raw` equals `valid`. With slip 0.3 some `raw` flags are false
+while `valid` is all true. `docs/SPEC.md` §3.2 calls 0.05 a twin assumption. The source comment does not use
+those words. Removing it means the study's rate of invalid proposals, or setting slip to 0 when the
+comparison should assume well-formed questions.
 
 `src/js/15-experiments.js:77-91` — grasp success. An executed attempt draws a uniform number and succeeds when
 it falls under `PAPER.graspByCat` for the object's category (cup 96.61%, bottle 85.25%, fork 80.77%, spoon
 89.29%). The draw is keyed by the trial seed, not by the policy. The paper's rates are real-robot
 measurements; the twin's contact is this coin flip. The comment does not say TODO-SOURCE. `docs/SPEC.md`
 §3.3 labels the sampling as simulated. Removing it means a contact model, or the study's per-attempt
-outcomes.
+outcomes. Grasp % and full-task % are this draw, so they are sampled from the paper's category rates
+and are not an out-of-sample prediction. Only the online target accuracy is out-of-sample among those rates.
 
 `src/js/16-kinematics.js:17` — base shell height (TODO-SOURCE). `STRETCH.baseHeight` = 0.12 m. The datasheet
 gives the 1.41 m overall and not a shell height. 0.12 m sits just above the 4 inch wheels. Removing it means
@@ -225,14 +238,17 @@ Several close rows are consequences of the fit or of the pairing; those are name
 
 **Close, and why.**
 
-Mean \|S0\| is 2.476 against 2.49, and the multi-candidate rate is 46.57% against 46.10%. Clarifying asked
-rates are 2.22 / 47.78 / 89.72 against the fit targets 3.13 / 46.62 / 91.65. Those three are the calibrated
-rows.
+Mean \|S0\| is 2.476 against 2.49, and the multi-candidate rate is 46.57% against 46.10%. Those two match
+because the bands were fitted to them.
+
+Partial and ambiguous asked rates, 47.78 and 89.72, sit within about two points of the derived targets
+46.62 and 91.65. Clear does not: 2.22 against the derived 3.13 is 0.91 points low, about 29%. The bands
+were aimed at that row. The miss is not agreement, and the panel says so.
 
 Overall asked rate is 46.57% for every clarifying policy, against the paper's 46.76–48.15. The offline
 protocol is balanced across the three instruction types (72 each), so the overall rate is essentially the
-mean of the three calibrated type rates. It is out of sample as a published cell and it is not an independent
-check.
+mean of the three type rates, and the clear miss is partly cancelled by partial. It is out of sample as a
+published cell and it is not an independent check.
 
 ActivAsk's questions on asked trials are 1.923 against the paper's 1.91 offline, and 1.879 against 1.84
 online. At \|S0\| = 2 the twin asks 1.00, as the paper and the ideal do. At \|S0\| = 4 ActivAsk asks 2.02
@@ -254,7 +270,8 @@ From ε = 0.10 upward, ActivAsk's noise curve is 80.82 / 72.24 / 65.31 against t
 Online, the top-score policy's target accuracy averages 59.65 against the paper's 59.65, with 34.0 attempts
 against 34 and 23.0 not executed against 23. The five seeds range from 56.14 to 64.91, so the match is the
 mean, and the paper's interval is 46.70–71.38. VLM-question full-task rate is 80.00 against 80.70. Random
-full-task rate is 50.88 against 50.88. Online ActivAsk questions are the close cell already cited.
+full-task rate is 50.88 against 50.88. Those full-task cells inherit the category-rate grasp draw, so the
+match is not an out-of-sample grasp prediction. Online ActivAsk questions are the close cell already cited.
 
 The ambiguous K curve now falls: mean minimum G is −0.628, −0.661, −0.673, −0.678, −0.680 at K = 1..5. The
 paper falls from −0.649 to −0.670. Direction matches Sec. 5.3, because a larger uniform draw is more likely
@@ -308,4 +325,5 @@ for the two clarifying policies match each other because they execute the same a
 keyed by the trial seed. Across policies the rates sit near 91% (top 90.71, random 91.63, clarifying 90.86).
 The paper's random grasp rate is 82.86 and ActivAsk's is 94.34. The twin cannot reproduce that spread: every
 policy draws from the same category table, and the only policy effect is which categories happen to be
-executed.
+executed. Grasp % and full-task % are sampled from the paper's category rates. They are not out-of-sample.
+Only the online target accuracy is.
