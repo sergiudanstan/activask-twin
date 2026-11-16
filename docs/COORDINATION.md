@@ -4,13 +4,20 @@ Plan: `~/.claude/plans/ok-like-this-mini-curried-milner.md`. **Lead: Claude (her
 merges into `main`, pushes, and sends prompts. Workers commit only on `feat/<name>` in
 `~/code/activask-twin-wt/<name>`, touch only their own files, and never push.
 
-| Task | Files | Owner | Branch | State |
-|---|---|---|---|---|
-| M0 scaffold + contracts | shell, 10, 12, 19, tests harness, tools | Claude | main | done (e1b460c, af204e0 layout fix) |
-| scenes data (M6) | 11 | OpenCode `wX:p4` | feat/scenes | merged (d6a3176): 56 scenes, 336 instructions, 189 unique offline texts |
-| reasoning (M2+M3) | 13, 14 | Grok `wX:p5` (moved from Codex: read-only sandbox outside its cwd, weekly limit 1 %) | feat/reasoning | merged (5c71972): 86 checks, 12 perturbations |
-| scene (M1) | 16 (specs), 25, 26, 40 | Grok `wX:p2` | feat/scene | merged (2e6fd38): sourced Stretch 3 specs, lab, objects, robot |
-| experiments (M5) | 15, PER_SCORE calibration | Grok `wX:p5` | feat/experiments | in progress |
-| grasp (M4) | 16 (IK), 41 | Grok `wX:p2` | feat/grasp | in progress |
-| ui (M7a) | page, 50, 60, 65, 66 | Grok `wX:p6` (new tab) | feat/ui | in progress |
-| integration + deploy (M7) | 70, review, Pages | Claude | main | last |
+| Task | Files | Owner | State |
+|---|---|---|---|
+| M0 scaffold + contracts | shell, 10, 12, 19, harness, tools | Claude | merged |
+| scenes data (M6) | 11 | OpenCode `wX:p4` | merged |
+| sweep (property test) | tests/sweep | OpenCode `wX:p4` | merged; found the repeated-question bug |
+| reasoning (M2+M3) | 13, 14 | Grok `wX:p5` (moved from Codex: read-only sandbox, weekly limit) | merged |
+| scene (M1) | 16 specs, 25, 26, 40 | Grok `wX:p2` | merged |
+| experiments (M5) + calibration | 15, PER_* | Grok `wX:p5` | merged after adversarial review |
+| grasp (M4) + r1 | 16, 41, 25, 40 | Grok `wX:p2` | merged after review (13 findings fixed) and re-check (0 penetrations > 0.5 mm in 10,038 grasps) |
+| ui (M7a) + r1 | page, 50, 60, 65, 66 | Grok `wX:p6` (new tab) | merged after review (24 findings) |
+| expui + r1 | 67, raw flags in 14 | Grok `wX:p5` | merged |
+| docs | README, FIDELITY | Grok `wX:p5` | merged |
+| integration + deploy | 20, 66 fixes, Pages | Claude | live: 01e1f0f |
+
+Open: lateral clearance margin in the grasp corridor test (contacts of 0.5-2 mm allowed); FIDELITY.md line
+references not re-verified after the r1 merges; README screenshot marker empty; the grasp r1 visual re-check did not
+run (Claude usage limit), only the kinematic one.
