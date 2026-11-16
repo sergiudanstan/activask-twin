@@ -2113,23 +2113,11 @@ function clSample(pool, K, r) {
   return arr.slice(0, n);
 }
 
-// TODO-SOURCE: the paper says the VLM proposes K questions; it does not say they are a uniform subset.
-// A uniform draw of K often misses every balanced split, and ActivAsk then cannot approach the published
-// question counts (2.700 vs ideal 2.667 at |S0| = 6). When the full pool has a maximally balanced
-// partition and the draw missed all of them, swap it into the last slot. ActivAsk still chooses only
-// inside the K it is shown.
-function clKeepBalance(pool, chosen) {
-  if (!pool.length || !chosen.length) return chosen;
-  let best = pool[0];
-  for (const p of pool) {
-    if (clImb(p) < clImb(best) || (clImb(p) === clImb(best) && p.key < best.key)) best = p;
-  }
-  if (chosen.some((p) => clImb(p) === clImb(best))) return chosen;
-  const next = chosen.slice();
-  next[next.length - 1] = best;
-  return next;
-}
-
+// TODO-SOURCE: the paper says the VLM proposes K questions; it does not say how they are distributed. The twin
+// draws K distinct partitions uniformly from the enumerated pool (simulated VLM diversity). ActivAsk chooses only
+// inside the K it is shown, so a larger K raises the chance of a balanced split (paper Sec. 5.3: the mean minimum
+// EFE falls as K grows). An earlier version swapped the most balanced partition into every draw; that made K
+// irrelevant (flat K sweep) and changed ActivAsk's questions on asked trials by only 0.007, so it was removed.
 function clSlip(p, S, r) {
   const kind = Math.floor(r() * 3);
   if (kind === 0 && S.length) {
@@ -2159,7 +2147,7 @@ function proposeQuestions(S, cands, scene, history, opts) {
   const pool = clEnumerate(S, cands, scene).filter((p) => !hist.has(p.key));
   if (!pool.length) return [];
   const r = rng((seed >>> 0) || 1);
-  let chosen = clKeepBalance(pool, clSample(pool, K, r));
+  const chosen = clSample(pool, K, r);
   const built = [];
   for (const raw of chosen) {
     const damaged = slip > 0 && r() < slip ? clSlip(raw, S, r) : raw;

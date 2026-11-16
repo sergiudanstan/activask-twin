@@ -1,5 +1,13 @@
 // Experiments (15-experiments.js): Wilson CI, offline/online protocol, perception calibration, grasp stage.
 export default function (L, check) {
+  // paper Sec. 5.3: with more proposals the best available split gets more balanced (mean minimum G falls)
+  {
+    const ks = L.kSweep({ K: [1, 2, 3, 4, 5] });
+    const amb = ks.ambiguous || ks.amb;
+    check(Array.isArray(amb) && amb.length === 5 && amb[0] - amb[4] >= 0.02 && amb[4] <= amb[1],
+      "mean minimum G on ambiguous rounds falls with K (K=1 " + (amb && amb[0].toFixed(3)) + " -> K=5 " + (amb && amb[4].toFixed(3)) + "; paper -0.649 -> -0.670)");
+  }
+
   const w = L.wilson(199, 216);
   check(w.length === 2 && w[0] === 87.76 && w[1] === 95.03, "wilson(199, 216) is [" + w.join(", ") + "] (paper CI 87.76, 95.03)");
   const wTop = L.wilson(116, 216);
@@ -103,6 +111,7 @@ export default function (L, check) {
 }
 
 export const perturbations = [
+  { name: "K ignored (whole pool offered every round)", find: "const chosen = clSample(pool, K, r);", replace: "const chosen = clSample(pool, pool.length, r);" },
   { name: "Wilson centre term quartered", find: "const centre = (p + z2 / (2 * n)) / den;", replace: "const centre = (p + z2 / (8 * n)) / den;" },
   { name: "grasp executes the wrong targets", find: "const executed = trial.outcome === \"correct\";", replace: "const executed = trial.outcome !== \"correct\";" },
   { name: "scene round-robin collapsed", find: "const scene = scenes[(k + t) % scenes.length];", replace: "const scene = scenes[k % scenes.length];" },
