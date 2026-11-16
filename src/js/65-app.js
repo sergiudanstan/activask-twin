@@ -1,7 +1,7 @@
 // ================================================================ trial controller (prefix app)
 // Auto runs runTrial and plays the dialogue. Interactive asks one proposal and waits for Yes/No.
 // Grasp runs only after a correct resolution (operator verification, Sec. 4.3).
-// A placeholder grasp segment is 2.4 s until graspWaypoints exists (M4). That duration is a twin assumption.
+// A placeholder grasp segment is 2.4 s when graspWaypoints cannot reach the object. That duration is a twin assumption.
 
 const appHomeQ = Object.freeze({
   x: stretchQ.x, lift: stretchQ.lift, arm: stretchQ.arm, yaw: stretchQ.yaw,
@@ -94,8 +94,8 @@ function appBelief() {
 }
 
 function appGraspKind(kind) {
-  return kind === "grasp" || kind === "pregrasp" || kind === "descend" || kind === "close"
-    || kind === "lift" || kind === "retract" || kind === "reobserve";
+  return kind === "grasp" || kind === "clear" || kind === "base" || kind === "pregrasp" || kind === "descend"
+    || kind === "close" || kind === "lift" || kind === "retract" || kind === "reobserve";
 }
 
 function appMarkAlive(ids) {
@@ -119,8 +119,7 @@ function appSegAt(t) {
 
 function appPushSeg(segs, kind, label, dur, extra) {
   const t0 = segs.length ? segs[segs.length - 1].t1 : 0;
-  const q = { ...appHomeQ };
-  const s = { t0, t1: t0 + dur, kind, label, q0: q, q1: q };
+  const s = { t0, t1: t0 + dur, kind, label };
   if (extra) Object.assign(s, extra);
   segs.push(s);
   return s;
@@ -130,7 +129,7 @@ function appPlanOf(obj) {
   if (typeof planGrasp !== "function" || typeof stretchIK !== "function" || !obj) return null;
   try {
     const plan = planGrasp(obj);
-    if (!plan) return null;
+    if (!plan || plan.ok === false) return null;
     const q = stretchIK(plan.p, plan.yaw);
     return { plan, q };
   } catch (e) { return null; }
@@ -146,11 +145,14 @@ function appClearGraspTick() {
 function appAppendMotion(segs, obj) {
   let motion = null;
   if (typeof graspWaypoints === "function") {
-    try { motion = graspWaypoints(obj, { ...appHomeQ }); }
+    const others = [];
+    const all = appPlaced && appPlaced.objects ? appPlaced.objects : [];
+    for (let i = 0; i < all.length; i++) if (all[i].id !== obj.id) others.push(all[i]);
+    try { motion = graspWaypoints(obj, { ...appHomeQ }, others); }
     catch (e) { motion = null; }
   }
   const tBase = segs.length ? segs[segs.length - 1].t1 : 0;
-  if (motion && motion.length) {
+  if (Array.isArray(motion) && motion.length) {
     let t = tBase;
     for (let i = 0; i < motion.length; i++) {
       const s = motion[i];
