@@ -34,14 +34,14 @@ function stretchProjMap() {
 }
 const stretchProjMat = new THREE.MeshStandardMaterial({ map: stretchProjMap(), roughness: 0.4, metalness: 0.1 });
 
-// Index 0 is the distal link and carries the wrist at local y = stretchArmLen[0].
-// Pitch 0, arm 0: stow[0] + armLen[0] + 0.015 + 0.03 + 0.093 = 0.28 = STRETCH.gripY.retracted.
+// Index 0 is the distal link. Its length, stow and the wrist offsets are STRETCH.tool, the same
+// numbers stretchFK uses. The other four sleeve lengths are mesh only.
 // Retracted tips step outward (0.142, 0.132, 0.118, 0.102, 0.090) so each sleeve shows.
 // Shares keep the sleeves overlapped at full extension (0.52 m on the distal link).
-const stretchArmLen = [0.130, 0.150, 0.160, 0.180, 0.210];
+const stretchArmLen = [STRETCH.tool.armLen0, 0.150, 0.160, 0.180, 0.210];
 const stretchArmW = [0.030, 0.042, 0.054, 0.066, 0.078];
 const stretchArmH = [0.020, 0.028, 0.036, 0.044, 0.052];
-const stretchArmStow = [0.012, -0.018, -0.042, -0.078, -0.120];
+const stretchArmStow = [STRETCH.tool.stow0, -0.018, -0.042, -0.078, -0.120];
 const stretchArmShare = [1, 0.78, 0.55, 0.30, 0];
 
 const stretchMastY = -0.09;
@@ -129,13 +129,13 @@ stretchYaw.position.y = stretchArmLen[0];
 
 const stretchPitch = new THREE.Group();
 stretchPitch.name = "stretch-wrist-pitch";
-stretchPitch.position.y = 0.015;
+stretchPitch.position.y = STRETCH.tool.pitch;
 stretchYaw.add(stretchPitch);
 rbox(0.038, 0.028, 0.032, 0.003, stretchWrist, 0, 0.012, -0.008, stretchPitch).name = "stretch-wrist-pitch-body";
 
 const stretchRoll = new THREE.Group();
 stretchRoll.name = "stretch-wrist-roll";
-stretchRoll.position.y = 0.03;
+stretchRoll.position.y = STRETCH.tool.roll;
 stretchPitch.add(stretchRoll);
 {
   const rollBody = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.022, 16), stretchWrist);
@@ -169,7 +169,7 @@ function stretchFinger(sign) {
     [0.0082, 0.0072], [0.004, 0.0048], [0.001, 0.003],
   ], stretchCupMat, g, 16);
   cup.rotation.y = sign > 0 ? -Math.PI / 2 : Math.PI / 2;
-  cup.position.set(sign * 0.003, 0.09, 0);
+  cup.position.set(sign * STRETCH.tool.cupX, STRETCH.tool.cupY, 0);
   cup.name = g.name + "-tip";
   return g;
 }
@@ -177,7 +177,7 @@ const stretchFingerL = stretchFinger(-1);
 const stretchFingerR = stretchFinger(1);
 const stretchTip = new THREE.Object3D();
 stretchTip.name = "stretch-fingertip";
-stretchTip.position.set(0, 0.093, 0);
+stretchTip.position.set(0, STRETCH.tool.tip, 0);
 stretchGripper.add(stretchTip);
 
 // ---- head: pan, tilt, D435i. The optical centre is the tilt origin, parked on CAM_POSE. ----
