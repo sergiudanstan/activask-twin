@@ -1,7 +1,8 @@
 // ================================================================ head camera (prefix hc)
 // Renders stretchHeadCam() into #cam-canvas at <= 5 Hz while the Camera panel is open.
-// Cand.box is the perception pinhole (CAM_POSE). The check projects each object centre
-// with this same three.js camera and requires it inside that box.
+// Cand.box is the perception pinhole (CAM_POSE). The check projects each object's
+// 3D box with this three.js camera and requires IoU >= 0.8. A shifted or oversized
+// box must fail. Number tags keep a constant pixel size and sit above the object.
 
 let hcCam = null;
 let hcTarget = null;
@@ -19,6 +20,12 @@ const hcLook = new THREE.Vector3();
 const hcTmp = new THREE.Vector3();
 const hcVp = new THREE.Vector4();
 const hcSc = new THREE.Vector4();
+const hcLift = new Float64Array(128);
+const hcPx = new Float64Array(128);
+const hcPy = new Float64Array(128);
+const hcPw = new Float64Array(128);
+const hcLab = [];
+for (let i = 0; i < 32; i++) hcLab.push({ x: 0, y: 0, w: 0, h: 0 });
 
 function hcAim() {
   const h = stretchHeadCam();
@@ -54,15 +61,17 @@ function hcMakeSprite(disp) {
   tex.generateMipmaps = false;
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false });
   const s = new THREE.Sprite(mat);
-  s.scale.set(0.09, 0.09, 1);
+  s.scale.set(0.02, 0.02, 1);
+  s.center.set(0.5, 0);
   s.renderOrder = 20;
   s.castShadow = false;
   s.receiveShadow = false;
   s.name = "tag-c" + disp;
   s.userData.appSprite = true;
   s.userData.hcDisp = disp;
+  s.userData.hcBase = new THREE.Vector3();
   return s;
 }
 
@@ -84,11 +93,93 @@ function hcRebuildTags() {
     if (!o || !group) continue;
     const s = hcMakeSprite(c.disp);
     // Scene space, not under world: a sprite parented to the -90° cell frame
-    // lies flat and casts a square shadow across the cup.
-    const z = TABLE.h + dimsOf(o).h + 0.08;
-    s.position.set(o.x, z, -o.y);
+    // lies flat and casts a square shadow across the cup. The anchor is the
+    // object top; hcLayoutTags lifts the disc above the screen box.
+    const z = TABLE.h + dimsOf(o).h;
+    s.userData.hcObj = o;
+    s.userData.hcBase.set(o.x, z, -o.y);
+    s.position.copy(s.userData.hcBase);
     scene.add(s);
     hcTags.push(s);
+  }
+}
+
+function hcScreenTop(o, w, h) {
+  const d = dimsOf(o);
+  const hx = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.l / 2;
+  const hy = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.w / 2;
+  const yaw = o.yaw || 0;
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  let top = Infinity, n = 0;
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [0, 1]) {
+    const lx = sx * hx, ly = sy * hy;
+    hcTmp.set(o.x + c * lx - s * ly, TABLE.h + sz * d.h, -(o.y + s * lx + c * ly));
+    hcTmp.project(camera);
+    if (hcTmp.z < -1 || hcTmp.z > 1) continue;
+    const v = (0.5 - hcTmp.y * 0.5) * h;
+    if (v < top) top = v;
+    n++;
+  }
+  return n ? top : null;
+}
+
+function hcTagOverlap(i, j) {
+  const iw = hcPw[i], jw = hcPw[j];
+  const ix0 = hcPx[i] - iw * 0.5, ix1 = hcPx[i] + iw * 0.5;
+  const iy1 = hcPy[i] - hcLift[i] * iw, iy0 = iy1 - iw;
+  const jx0 = hcPx[j] - jw * 0.5, jx1 = hcPx[j] + jw * 0.5;
+  const jy1 = hcPy[j] - hcLift[j] * jw, jy0 = jy1 - jw;
+  return ix0 < jx1 - 2 && ix1 > jx0 + 2 && iy0 < jy1 - 2 && iy1 > jy0 + 2;
+}
+
+function hcLayoutTags() {
+  const n = hcTags.length;
+  if (!n || n > hcLift.length) return;
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  if (w < 2 || h < 2) return;
+  const k = 2 * Math.tan((camera.fov * Math.PI) / 360) / h;
+  for (let i = 0; i < n; i++) {
+    const s = hcTags[i];
+    const px = appHot === s.userData.hcDisp ? 32 : 26;
+    hcPw[i] = px;
+    const sc = px * k;
+    if (s.scale.x !== sc) s.scale.set(sc, sc, 1);
+    const o = s.userData.hcObj;
+    const top = o ? hcScreenTop(o, w, h) : null;
+    hcTmp.copy(s.userData.hcBase);
+    hcTmp.project(camera);
+    if (hcTmp.z < -1 || hcTmp.z > 1) {
+      s.visible = false;
+      hcPx[i] = -9999;
+      hcLift[i] = 0;
+      continue;
+    }
+    s.visible = true;
+    const u = (hcTmp.x * 0.5 + 0.5) * w;
+    const v = (0.5 - hcTmp.y * 0.5) * h;
+    hcPx[i] = u;
+    hcPy[i] = v;
+    const clear = top == null ? 0 : Math.max(0, (v - top) / px);
+    hcLift[i] = clear + 4 / px;
+  }
+  for (let pass = 0; pass < 10; pass++) {
+    let hit = false;
+    for (let i = 0; i < n; i++) {
+      if (hcPx[i] < -1000) continue;
+      for (let j = 0; j < i; j++) {
+        if (hcPx[j] < -1000) continue;
+        if (!hcTagOverlap(i, j)) continue;
+        const up = hcPy[i] >= hcPy[j] ? i : j;
+        hcLift[up] += 0.55;
+        hit = true;
+      }
+    }
+    if (!hit) break;
+  }
+  for (let i = 0; i < n; i++) {
+    if (hcLift[i] > 6) hcLift[i] = 6;
+    const s = hcTags[i];
+    if (s.center.y !== -hcLift[i]) s.center.set(0.5, -hcLift[i]);
   }
 }
 
@@ -101,8 +192,8 @@ function hcSyncTags() {
     const opacity = alive ? 1 : 0.28;
     if (s.material.opacity !== opacity) s.material.opacity = opacity;
     s.material.color.setHex(alive ? 0xffffff : 0x9a9a9a);
-    const sc = hot ? 0.11 : 0.09;
-    if (s.scale.x !== sc) s.scale.set(sc, sc, 1);
+    if (hot) s.renderOrder = 21;
+    else s.renderOrder = 20;
   }
 }
 
@@ -125,10 +216,23 @@ function hcBlit() {
   hcCtx.putImageData(hcImg, 0, 0);
 }
 
+function hcLabelHit(x, y, w, h, n) {
+  for (let i = 0; i < n; i++) {
+    const r = hcLab[i];
+    if (x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y) return true;
+  }
+  return false;
+}
+
 function hcDrawBoxes() {
   const g = hcCtx;
-  g.font = "600 15px sans-serif";
+  const canvas = $("cam-canvas");
+  const shown = canvas ? canvas.clientWidth : CAM.w;
+  const fontPx = Math.max(22, Math.round(14 * CAM.w / Math.max(80, shown || CAM.w)));
+  const lh = fontPx + 6;
+  g.font = "600 " + fontPx + "px sans-serif";
   g.textBaseline = "alphabetic";
+  let placed = 0;
   for (let i = 0; i < appCands.length; i++) {
     const c = appCands[i];
     const b = c.box;
@@ -142,12 +246,26 @@ function hcDrawBoxes() {
     g.strokeRect(x, y, w, h);
     const text = hcLabels[i] || String(c.disp);
     const tw = g.measureText(text).width;
-    const ly = y >= 20 ? y - 18 : y + 2;
+    const bw = tw + 10;
+    let lx = x;
+    let ly = y >= lh + 2 ? y - lh : y + 2;
+    for (let k = 0; k < 6 && hcLabelHit(lx, ly, bw, lh, placed); k++) {
+      if (k % 2 === 0) ly += lh + 2;
+      else lx += 8;
+    }
+    if (ly + lh > CAM.h) ly = Math.max(0, CAM.h - lh);
     g.setLineDash(hcSolid);
     g.fillStyle = !alive ? "rgba(60,60,60,0.8)" : "rgba(20,16,14,0.82)";
-    g.fillRect(x, ly, tw + 8, 16);
+    g.fillRect(lx, ly, bw, lh);
     g.fillStyle = "#ffffff";
-    g.fillText(text, x + 4, ly + 13);
+    g.fillText(text, lx + 5, ly + fontPx);
+    if (placed < hcLab.length) {
+      hcLab[placed].x = lx;
+      hcLab[placed].y = ly;
+      hcLab[placed].w = bw;
+      hcLab[placed].h = lh;
+      placed++;
+    }
   }
 }
 
@@ -183,40 +301,75 @@ function hcRender() {
 }
 
 function hcTick() {
-  if (!hcCam || !panelOpen("camera-card")) return;
-  hcRender();
+  if (hcCam && panelOpen("camera-card")) hcRender();
+  hcLayoutTags();
+}
+
+function hcIoU(a, b) {
+  const x0 = Math.max(a[0], b[0]), y0 = Math.max(a[1], b[1]);
+  const x1 = Math.min(a[2], b[2]), y1 = Math.min(a[3], b[3]);
+  const iw = x1 - x0, ih = y1 - y0;
+  if (iw <= 0 || ih <= 0) return 0;
+  const inter = iw * ih;
+  const aa = Math.max(0, a[2] - a[0]) * Math.max(0, a[3] - a[1]);
+  const bb = Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+  const uni = aa + bb - inter;
+  return uni <= 0 ? 0 : inter / uni;
+}
+
+function hcProjectBox(o) {
+  const d = dimsOf(o);
+  const hx = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.l / 2;
+  const hy = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.w / 2;
+  const yaw = o.yaw || 0;
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  let u0 = Infinity, v0 = Infinity, u1 = -Infinity, v1 = -Infinity, n = 0;
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [0, 1]) {
+    const lx = sx * hx, ly = sy * hy;
+    hcTmp.set(o.x + c * lx - s * ly, TABLE.h + sz * d.h, -(o.y + s * lx + c * ly));
+    hcTmp.project(hcCam);
+    if (hcTmp.z < -1 || hcTmp.z > 1) continue;
+    const u = (hcTmp.x * 0.5 + 0.5) * CAM.w;
+    const v = (0.5 - hcTmp.y * 0.5) * CAM.h;
+    n++;
+    if (u < u0) u0 = u;
+    if (v < v0) v0 = v;
+    if (u > u1) u1 = u;
+    if (v > v1) v1 = v;
+  }
+  return n ? [u0, v0, u1, v1] : null;
 }
 
 function hcCheckBoxes() {
   if (!hcCam) return { ok: false, detail: "head camera is not ready" };
   if (!appCands.length) return { ok: true, detail: "no candidates" };
   hcAim();
-  let worst = 0, bad = 0;
+  let minIoU = 1, bad = 0, worstShift = 0, worstBig = 0;
   const bits = [];
   for (let i = 0; i < appCands.length; i++) {
     const c = appCands[i];
     const o = appObj(c.obj);
-    if (!o || !c.box) { bad++; bits.push(c.id + " missing"); continue; }
-    const z = TABLE.h + dimsOf(o).h * 0.5;
-    hcTmp.set(o.x, z, -o.y);
-    hcTmp.project(hcCam);
-    const u = (hcTmp.x * 0.5 + 0.5) * CAM.w;
-    const v = (0.5 - hcTmp.y * 0.5) * CAM.h;
+    const proj = o ? hcProjectBox(o) : null;
+    if (!o || !c.box || !proj) { bad++; bits.push(c.id + " missing"); continue; }
+    const iou = hcIoU(proj, c.box);
+    if (iou < minIoU) minIoU = iou;
     const b = c.box;
-    const du = u < b[0] ? b[0] - u : (u > b[2] ? u - b[2] : 0);
-    const dv = v < b[1] ? b[1] - v : (v > b[3] ? v - b[3] : 0);
-    const out = Math.hypot(du, dv);
-    if (out > worst) worst = out;
-    const behind = hcTmp.z < -1 || hcTmp.z > 1;
-    if (behind || out > 3) {
-      bad++;
-      bits.push(c.id + " (" + u.toFixed(0) + "," + v.toFixed(0) + ") off " + out.toFixed(1) + "px");
-    }
+    const bw = b[2] - b[0], bh = b[3] - b[1];
+    const shift = Math.max(30, Math.min(bw, bh) * 0.5);
+    const shifted = [b[0] + shift, b[1] + shift, b[2] + shift, b[3] + shift];
+    const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    const big = [cx - bw * 1.5, cy - bh * 1.5, cx + bw * 1.5, cy + bh * 1.5];
+    const si = hcIoU(proj, shifted), bi = hcIoU(proj, big);
+    if (si > worstShift) worstShift = si;
+    if (bi > worstBig) worstBig = bi;
+    if (iou < 0.8) { bad++; bits.push(c.id + " IoU " + iou.toFixed(2)); }
+    if (si >= 0.8 || bi >= 0.8) { bad++; bits.push(c.id + " control still passes"); }
   }
-  return {
-    ok: bad === 0,
-    detail: bad ? bits.join("; ") : appCands.length + " centres inside, max outside " + worst.toFixed(2) + " px",
-  };
+  const ok = bad === 0;
+  const detail = ok
+    ? appCands.length + " boxes, min IoU " + minIoU.toFixed(2) + "; shift IoU " + worstShift.toFixed(2) + "; oversized IoU " + worstBig.toFixed(2)
+    : bits.join("; ");
+  return { ok, detail };
 }
 
 function hcBoot() {

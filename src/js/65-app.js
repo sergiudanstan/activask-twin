@@ -30,6 +30,7 @@ let appSegs = [];
 let appGroups = new Map();
 let appLog = [];
 let appLogRow = null;
+let appSnap = null;
 let appWillGrasp = false;
 let appHasWaypoints = false;
 let appPlan = null;
@@ -280,7 +281,9 @@ function appApplyNow(seg) {
     uiSetNow("say", "–");
     uiSetNow("user", seg.label === "yes" ? "Yes" : "No", "answer");
   } else if (seg.kind === "resolved") {
-    uiSetNow("robot", "Resolved", appTrial && appTrial.resolved ? appTrial.resolved : "");
+    const id = appTrial && appTrial.resolved;
+    const cand = id ? appCand(id) : null;
+    uiSetNow("robot", "Resolved", cand ? String(cand.disp) : "");
     uiSetNow("say", appBelief() || "resolved", "say");
     uiSetNow("user", "–");
   } else if (seg.kind === "unresolved") {
@@ -344,10 +347,27 @@ function appSyncInteractive() {
   uiPaint();
 }
 
+function appSnapshot() {
+  appSnap = {
+    scene: appSceneId,
+    instruction: appInstr ? appInstr.text : "",
+    type: appInstr ? appInstr.type : "",
+    policy: appPolicy,
+    eps: appEps,
+    K: appK,
+    seed: appSeed,
+    mode,
+    S0: appCands.length,
+  };
+}
+
 function appRowFromTrial(tr) {
+  const s = appSnap || {};
   return {
-    scene: appSceneId, instruction: appInstr ? appInstr.text : "", type: appInstr ? appInstr.type : "",
-    policy: appPolicy, eps: appEps, K: appK, S0: appCands.length,
+    scene: s.scene || "", instruction: s.instruction || "", type: s.type || "",
+    policy: s.policy || "", eps: s.eps == null ? "" : s.eps, K: s.K == null ? "" : s.K,
+    seed: s.seed == null ? "" : s.seed, mode: s.mode || mode,
+    S0: s.S0 == null ? 0 : s.S0,
     questions: tr ? tr.questions : 0, outcome: tr ? tr.outcome : "",
     resolved: tr && tr.resolved ? tr.resolved : "", target: appTarget || "",
   };
@@ -359,11 +379,11 @@ function appRecord(row) {
 }
 
 function appDropPartial() {
-  if (mode !== "interactive" || appIxLogged || !appRounds.length || !appInstr) return;
+  if (!appSnap || appSnap.mode !== "interactive" || appIxLogged || !appRounds.length) return;
   appRecord({
-    scene: appSceneId, instruction: appInstr.text, type: appInstr.type, policy: appPolicy,
-    eps: appEps, K: appK, S0: appCands.length, questions: appRounds.length,
-    outcome: "unresolved", resolved: "", target: appTarget || "",
+    scene: appSnap.scene, instruction: appSnap.instruction, type: appSnap.type, policy: appSnap.policy,
+    eps: appSnap.eps, K: appSnap.K, seed: appSnap.seed, mode: appSnap.mode, S0: appSnap.S0,
+    questions: appRounds.length, outcome: "unresolved", resolved: "", target: appTarget || "",
   });
   appIxLogged = true;
 }
@@ -371,6 +391,7 @@ function appDropPartial() {
 function appRunAuto() {
   appTarget = appDrawTarget(appInstr, appSeed);
   appTargetChosen = true;
+  appSnapshot();
   appIxDone = true;
   appIxLogged = true;
   appTrial = runTrial(appPlaced, appInstr, appTarget, appPolicy, { seed: appSeed, eps: appEps, K: appK });
@@ -395,7 +416,10 @@ function appDirectResolved() {
 function appAskNext() {
   const roundSeed = (appSeed + (appRounds.length + 1) * 0x9e3779b1) >>> 0 || 1;
   const hist = [];
-  for (let i = 0; i < appRounds.length; i++) hist.push(appRounds[i].sel.key);
+  for (let i = 0; i < appRounds.length; i++) {
+    hist.push(appRounds[i].sel.key);
+    if (appRounds[i].sel.text) hist.push(appRounds[i].sel.text);
+  }
   appProps = proposeQuestions(appS, appCands, appPlaced, hist, { K: appK, seed: roundSeed, slip: 0.05 });
   appPending = selectProp(appPolicy, appProps, roundSeed);
   if (appPending) appMaybeSpeak(appPending.text);
@@ -428,7 +452,7 @@ function appFinishInteractive() {
   if (fromStart) { seek(0); setPlaying(true); }
   else if (appWillGrasp) { seek(resolvedT0); setPlaying(true); }
   else { seek(resolvedT0); setPlaying(false); }
-  appSyncInteractive();
+  appSyncAuto(time);
   appApplyNow(appSegAt(time));
   appLastSeg = appSegAt(time);
   uiDrawLanes();
@@ -437,6 +461,7 @@ function appFinishInteractive() {
 function appStartInteractive() {
   appTarget = null;
   appTargetChosen = false;
+  appSnapshot();
   appTrial = null;
   appIxDone = false;
   appIxLogged = false;
@@ -488,16 +513,42 @@ function appAnswer(ans) {
   uiDrawLanes();
 }
 
+function appRetimeline(playGrasp) {
+  appClearGraspTick();
+  appSegs = appComposeAuto(appTrial);
+  setTimeline(appSegs);
+  setStretch({ ...appHomeQ });
+  uiDrawLanes();
+  if (playGrasp && appWillGrasp) {
+    let t0 = 0;
+    for (let i = 0; i < appSegs.length; i++) if (appGraspKind(appSegs[i].kind)) { t0 = appSegs[i].t0; break; }
+    seek(t0);
+    setPlaying(true);
+  } else if (!appWillGrasp) {
+    let t0 = 0;
+    for (let i = 0; i < appSegs.length; i++) if (appSegs[i].kind === "resolved" || appSegs[i].kind === "unresolved") t0 = appSegs[i].t0;
+    seek(t0);
+    setPlaying(false);
+  }
+  appSyncAuto(time);
+  appApplyNow(appSegAt(time));
+  appLastSeg = appSegAt(time);
+}
+
 function appChooseTarget(id) {
   if (mode !== "interactive") return;
   appTarget = id;
   appTargetChosen = true;
   if (appIxDone && appTrial && appTrial.resolved) {
     const c = appCand(appTrial.resolved);
-    appTrial.outcome = c && c.obj === id ? "correct" : "wrong";
+    const outcome = c && c.obj === id ? "correct" : "wrong";
+    const prev = appTrial.outcome;
+    const hadGrasp = appWillGrasp;
+    appTrial.outcome = outcome;
     appTrial.target = id;
-    if (appLogRow) { appLogRow.outcome = appTrial.outcome; appLogRow.target = id; }
-    appSyncInteractive();
+    if (appLogRow) { appLogRow.outcome = outcome; appLogRow.target = id; }
+    if (outcome !== prev || (outcome === "correct") !== hadGrasp) appRetimeline(outcome === "correct" && !hadGrasp);
+    else appSyncAuto(time);
     return;
   }
   const note = $("app-target-note");
@@ -563,6 +614,8 @@ function appReadForm() {
   appK = Math.min(5, Math.max(1, Math.round(Number($("app-k").value) || 4)));
   const seed = Math.round(Number($("app-seed").value));
   appSeed = Number.isFinite(seed) && seed >= 1 ? seed : 1;
+  const seedEl = $("app-seed");
+  if (seedEl) seedEl.value = String(appSeed);
   appSpeech = !!($("app-speech") && $("app-speech").checked);
 }
 
@@ -592,8 +645,8 @@ function appFillPolicies() {
     if (set === "online" && !p.online) continue;
     const o = document.createElement("option");
     o.value = p.id;
-    o.textContent = p.label;
-    o.title = p.rule;
+    o.textContent = uiPolicyLabel(p);
+    o.title = uiPolicyRule(p);
     sel.appendChild(o);
   }
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
@@ -651,6 +704,7 @@ function appOnForm(e) {
   }
   appReadForm();
   appShowRanges();
+  if (t && (t.tagName === "SELECT" || (t.tagName === "INPUT" && (t.type === "range" || t.type === "number")))) t.blur();
   appRebuild();
 }
 
@@ -698,7 +752,12 @@ function appBindPointer() {
 
 function appOnKey(e) {
   if (mode !== "interactive" || e.repeat) return;
-  if (e.target && e.target.closest && e.target.closest("input, select, textarea")) return;
+  const t = e.target;
+  if (t && t.tagName === "TEXTAREA") return;
+  if (t && t.tagName === "INPUT") {
+    const ty = (t.type || "text").toLowerCase();
+    if (ty !== "range" && ty !== "checkbox" && ty !== "radio" && ty !== "button") return;
+  }
   if (e.key === "y" || e.key === "Y") { e.preventDefault(); appAnswer("yes"); }
   else if (e.key === "n" || e.key === "N") { e.preventDefault(); appAnswer("no"); }
 }
@@ -712,7 +771,7 @@ function appTick(t) {
   if (seg === appLastSeg) return;
   appLastSeg = seg;
   appApplyNow(seg);
-  if (mode === "auto") appSyncAuto(t);
+  if (mode === "auto" || (mode === "interactive" && appIxDone)) appSyncAuto(t);
 }
 
 function appBoot() {
@@ -748,6 +807,11 @@ setMode = function (m) {
   if (appReady && mode === "interactive" && m !== "interactive") appDropPartial();
   appSetMode(m);
   if (appReady) appRebuild();
+};
+const appSetPlaying = setPlaying;
+setPlaying = function (on) {
+  if (on && time >= DURATION && !$("loop").checked) seek(0);
+  appSetPlaying(on);
 };
 
 queueMicrotask(appBoot);
