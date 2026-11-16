@@ -93,6 +93,17 @@ gtao.updateGtaoMaterial({ radius: 0.12, distanceExponent: 1.5, thickness: 1.5, s
 gtao.blendIntensity = 0.85;
 composer.addPass(new RenderPass(scene, camera));
 composer.addPass(gtao);
+// GTAO redraws the scene with an override normal material, which turns label sprites into opaque quads in its
+// normal/depth buffer (dark AO squares under every tag). Hide sprites for that pass only.
+{
+  const gtaoRender = gtao.render.bind(gtao), hidden = [];
+  gtao.render = (...args) => {
+    hidden.length = 0;
+    scene.traverseVisible((o) => { if (o.isSprite) hidden.push(o); });
+    for (const o of hidden) o.visible = false;
+    try { gtaoRender(...args); } finally { for (const o of hidden) o.visible = true; }
+  };
+}
 composer.addPass(new OutputPass());
 
 function fitComposer() {

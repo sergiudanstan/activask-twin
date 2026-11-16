@@ -27,8 +27,9 @@ const hcPw = new Float64Array(128);
 const hcLab = [];
 for (let i = 0; i < 32; i++) hcLab.push({ x: 0, y: 0, w: 0, h: 0 });
 
-function hcAim() {
-  const h = stretchHeadCam();
+// Aims the panel camera at the live head pose, or at a given pose (the checks use CAM_POSE: Cand.box is the
+// perception snapshot taken there, before the robot moves for the grasp).
+function hcAim(h = stretchHeadCam()) {
   hcPos.set(h.pos[0], h.pos[2], -h.pos[1]);
   hcLook.set(h.look[0], h.look[2], -h.look[1]);
   hcCam.position.copy(hcPos);
@@ -224,7 +225,14 @@ function hcLabelHit(x, y, w, h, n) {
   return false;
 }
 
+// True while the live head camera is still at the perception pose (within 1 cm), i.e. the boxes still match the picture.
+function hcAtPerceptionPose() {
+  const h = stretchHeadCam();
+  return Math.hypot(h.pos[0] - CAM_POSE.pos[0], h.pos[1] - CAM_POSE.pos[1], h.pos[2] - CAM_POSE.pos[2]) < 0.01 &&
+    Math.hypot(h.look[0] - CAM_POSE.look[0], h.look[1] - CAM_POSE.look[1], h.look[2] - CAM_POSE.look[2]) < 0.01;
+}
 function hcDrawBoxes() {
+  if (!hcAtPerceptionPose()) return;   // the robot moved for the grasp: the perception snapshot no longer matches the picture
   const g = hcCtx;
   const canvas = $("cam-canvas");
   const shown = canvas ? canvas.clientWidth : CAM.w;
@@ -343,7 +351,7 @@ function hcProjectBox(o) {
 function hcCheckBoxes() {
   if (!hcCam) return { ok: false, detail: "head camera is not ready" };
   if (!appCands.length) return { ok: true, detail: "no candidates" };
-  hcAim();
+  hcAim(CAM_POSE);
   let minIoU = 1, bad = 0, worstShift = 0, worstBig = 0;
   const bits = [];
   for (let i = 0; i < appCands.length; i++) {
