@@ -3,7 +3,9 @@
 //
 // TODO-SOURCE: the paper does not publish per-tier score distributions. Bands below are a twin assumption,
 // refit on the 36 offline scenes (paper: mean |S0| 2.49, multi-candidate 46.1 %, clarifying asked rates by
-// type about 3 / 47 / 92 %). Three documented rules sit on top of the bands:
+// type about 3 / 47 / 92 %). Those three quantities are therefore CALIBRATION TARGETS: the twin matching them is
+// not evidence. Out-of-sample comparisons are accuracy, questions on asked trials, questions vs |S0|, the noise
+// sweep, the K sweep and the online results. Three documented rules sit on top of the bands:
 //
 // 1. Specific phrase ("orange cup"). Every phrase match draws from `specific`, then all but the highest
 //    are redrawn from `rival` (PER_RIVAL). A modified prompt usually keeps one box; each extra phrase
@@ -14,7 +16,7 @@
 //    Confusable categories draw from `broadConf` and unrelated objects from `broadOther`, so an ambiguous
 //    instruction keeps most of the category and a few extras. Those loose bands are not used for a
 //    specific phrase. broadConf and broadOther top out below `full.lo`, so the top-score pick on a bare
-//    noun is still a category member.
+//    noun is almost always a category member (it fails only when every category member takes the missP draw).
 // 3. With probability `singleP` a bare-noun query is collapsed to its single best category box (PER_BARE).
 //    That is what lets ambiguous asked-rate sit near 92 % while the other ambiguous trials stay large
 //    enough for mean |S0| ≈ 2.49. Collapsing keeps the argmax, so a top-score policy is unchanged.
