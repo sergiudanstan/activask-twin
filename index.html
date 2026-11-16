@@ -170,13 +170,33 @@
   .zone-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--line); }
   @container vp (max-width: 1060px) { .hint .mouse { display: none; } }
   @container vp (max-width: 760px) { .hint { display: none; } }
+  /* Below ~1100 px the Views pill used to sit on the Now card. Stack it under Now. */
+  @container vp (max-width: 1100px) {
+    .toolbar { top: 116px; left: 10px; right: 10px; align-items: stretch; max-width: none; }
+    .views { justify-content: flex-start; max-width: none; }
+  }
+  .yn-bar { z-index: 6; left: 50%; bottom: 64px; transform: translateX(-50%); display: flex; gap: 8px; padding: 6px; }
+  .yn-bar .btn { min-width: 88px; font-weight: 600; }
+  #ui-yn-yes { background: var(--tray-soft); }
+  #ui-yn-no { background: var(--reject-soft); }
+  @media (min-width: 721px) { #ui-yn { display: none !important; } }
   .load-error { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
 
   /* transport */
   .transport { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--panel-2); }
+  @media (max-width: 1280px) {
+    .transport { flex-wrap: wrap; gap: 6px 8px; padding: 6px 8px; }
+    .clock { min-width: 0; font-size: 12px; }
+    .chips button { padding: 3px 6px; font-size: 11px; }
+    .toggle { font-size: 11px; }
+  }
   .play { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
   .play svg { width: 18px; height: 18px; }
   .timeline { flex: 1; min-width: 0; position: relative; height: 58px; cursor: pointer; touch-action: none; }
+  /* This follows the base .timeline rule. An earlier media query would lose flex and height to that shorthand. */
+  @media (max-width: 1280px) {
+    .timeline { order: 5; flex: 1 1 100%; height: 48px; }
+  }
   .timeline canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .playhead { position: absolute; left: 0; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; will-change: transform; }
   .playhead::before { content: ""; position: absolute; left: -4px; top: -1px; border: 5px solid transparent; border-top-color: var(--accent); }
@@ -402,6 +422,7 @@ table.grid tr.sel td { background: var(--accent-soft); }
 .range input[type="range"] { flex: 1; margin: 0; }
 .range output { flex: none; min-width: 34px; text-align: right; font: 500 12px var(--mono); }
 .field input[type="number"] { width: 100%; font: 500 12.5px var(--mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.field input:disabled { opacity: 0.45; }
 .cand-row { display: flex; flex-wrap: wrap; gap: 4px; min-height: 26px; }
 .cand { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 3px; border-radius: 999px; background: var(--panel-2); font: 500 12px var(--ui); }
 .cand i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); }
@@ -421,12 +442,14 @@ table.grid td.q { white-space: normal; }
 .flag { display: inline-block; margin-right: 1px; padding: 0 2px; border-radius: 3px; font: 600 8px var(--mono); letter-spacing: 0; }
 .flag.on { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 .flag.off { background: var(--bad-soft); color: var(--bad); }
+.flag.repair { background: var(--press-soft); color: var(--press); margin-left: 4px; font-size: 9px; }
 .star { color: var(--accent); }
 .hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .hist li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 .hist b { font: 600 11px var(--mono); text-transform: uppercase; color: var(--muted); }
 .outcome { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); font-size: 13px; }
 .outcome.correct { background: color-mix(in srgb, var(--good) 16%, transparent); }
+.outcome.none { background: var(--press-soft); }
 .outcome.wrong, .outcome.unresolved { background: var(--bad-soft); }
 .stat .value.sm { font-size: 13px; }
 #ui-yes { background: var(--tray-soft); }
@@ -475,7 +498,10 @@ table.grid td.q { white-space: normal; }
           <div class="field"><label for="app-scene">Scene</label><select id="app-scene"></select></div>
           <div class="field"><label for="app-instr">Instruction</label><select id="app-instr"></select></div>
           <div class="field"><label for="app-policy">Policy</label><select id="app-policy"></select></div>
+          <p class="small-note" id="app-vlm-note">Questions come from rule-based proposals that stand in for the paper's VLM.</p>
+          <p class="small-note" id="app-policy-note" hidden>This policy never asks. It picks one candidate and stops.</p>
           <div class="field"><label for="app-eps">ε</label><span class="range"><input id="app-eps" type="range" min="0" max="0.2" step="0.01" value="0"><output id="app-eps-out" for="app-eps">0.00</output></span></div>
+          <p class="small-note" id="app-eps-note" hidden>ε is not applied. Your Yes and No answers are not flipped.</p>
           <div class="field"><label for="app-k">K</label><span class="range"><input id="app-k" type="range" min="1" max="5" step="1" value="4"><output id="app-k-out" for="app-k">4</output></span></div>
           <div class="field"><label for="app-seed">Seed</label><input id="app-seed" type="number" min="1" step="1" value="1"></div>
           <div class="btn-row"><button class="btn" id="app-new" type="button">New trial</button></div>
@@ -498,7 +524,7 @@ table.grid td.q { white-space: normal; }
       </div>
     </div>
     <div class="card" id="camera-card">
-      <h2>Head camera <span>D435i colour · candidates</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
+      <h2>Head camera <span>D435i colour · simulated scores</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
       <div class="camwrap"><canvas id="cam-canvas" width="640" height="360" role="img" aria-label="Head camera picture with candidate boxes"></canvas></div>
       <div class="res" id="camera-res"></div>
     </div>
@@ -525,6 +551,10 @@ table.grid td.q { white-space: normal; }
       </div>
       <div class="overlay toolbar">
         <div class="views glass" role="group" aria-label="Camera views" id="views"></div>
+      </div>
+      <div class="overlay yn-bar glass" id="ui-yn" hidden>
+        <button class="btn" id="ui-yn-yes" type="button">Yes</button>
+        <button class="btn" id="ui-yn-no" type="button">No</button>
       </div>
       <div class="overlay hint glass" id="hint">
         <span><kbd>Space</kbd> play</span><span><kbd>1</kbd>–<kbd>7</kbd> views</span><span><kbd>Y</kbd>/<kbd>N</kbd> answer</span>
@@ -4834,13 +4864,15 @@ const cv = (x, y, z) => V(x, z, -y);
 // Aimed at the real cell: robot base on the -y side, table centred at the origin, head at CAM_POSE.
 // Table sits off the mast axis so the mast is not between the lens and the objects.
 // Head is the head camera: CAM vertical fov, near enough to clip the D435i housing.
+// Pulled back so the mast top and the base stay in frame when the drawer narrows the viewport.
+// Robot x stays inside the left wall (inner face about x = -2.41).
 const VIEW_DEFS = {
-  room:  { label: "Room",  pos: [2.35, -2.45, 1.90], target: [0.05, -0.05, 0.72] },
-  iso:   { label: "Iso",   pos: [1.72, -2.15, 1.62], target: [0.02, -0.28, 0.58] },
-  robot: { label: "Robot", pos: [-2.25, -0.20, 1.05], target: [0.20, -0.50, 0.70] },
-  table: { label: "Table", pos: [0.62, 1.02, 1.22], target: [-0.02, -0.04, 0.76] },
-  top:   { label: "Top",   pos: [0.02, -0.42, 2.25], target: [0.00, -0.02, 0.74] },
-  user:  { label: "User",  pos: [0.00, 1.48, 1.42], target: [0.00, -0.42, 0.86] },
+  room:  { label: "Room",  pos: [2.55, -2.35, 1.95], target: [-0.40, 0.20, 0.82], fov: 50 },
+  iso:   { label: "Iso",   pos: [2.20, -2.55, 2.05], target: [0.00, -0.30, 0.52], fov: 44 },
+  robot: { label: "Robot", pos: [-1.72, -0.55, 1.48], target: [0.22, -0.32, 0.48], fov: 54 },
+  table: { label: "Table", pos: [0.78, 1.22, 1.32], target: [-0.02, -0.02, 0.78], fov: 40 },
+  top:   { label: "Top",   pos: [0.00, -0.16, 2.65], target: [0.00, -0.24, 0.74], fov: 40 },
+  user:  { label: "User",  pos: [0.28, 1.52, 1.62], target: [-0.05, -0.55, 0.62], fov: 50 },
   head:  { label: "Head",  pos: [CAM_POSE.pos[0], CAM_POSE.pos[1], CAM_POSE.pos[2]], target: [CAM_POSE.look[0], CAM_POSE.look[1], CAM_POSE.look[2]], fov: CAM.vfov, near: 0.05 },
 };
 const views = Object.fromEntries(Object.entries(VIEW_DEFS).map(([k, v]) => [k, {
@@ -4869,6 +4901,7 @@ function setView(name) {
   document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
 }
 camera.position.copy(views.iso.pos); controls.target.copy(views.iso.target);
+if (views.iso.fov) { camera.fov = views.iso.fov; camera.updateProjectionMatrix(); }
 document.querySelectorAll(".views button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 controls.addEventListener("start", () => { flight = null; document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-pressed", "false")); });
 function resize() {
@@ -4887,7 +4920,17 @@ let mode = QS.get("mode") === "interactive" ? "interactive" : "auto";
 // ---- panels (?panels=clarify,camera opens exactly these)
 const openPanels = { auto: new Set(["live-card", "clarify-card"]), interactive: new Set(["clarify-card", "camera-card"]) };
 if (uiNarrow.matches) { openPanels.auto.clear(); openPanels.interactive.clear(); }
-if (QS.has("panels")) openPanels[mode] = new Set(QS.get("panels").split(",").map((k) => `${k.trim().toLowerCase()}-card`).filter((id) => $(id)));
+function uiPanelAllowed(id, m) {
+  const node = $(id);
+  if (!node) return false;
+  const rail = document.querySelector(`.rail-item[data-panel="${id}"]`);
+  if (!rail) return false;
+  return rail.dataset.modes.split(" ").includes(m);
+}
+if (QS.has("panels")) {
+  const ids = QS.get("panels").split(",").map((k) => `${k.trim().toLowerCase()}-card`);
+  for (const m of ["auto", "interactive"]) openPanels[m] = new Set(ids.filter((id) => uiPanelAllowed(id, m)));
+}
 const uiDrawer = $("drawer");
 let uiDrawerOpen = false;
 function syncPanels() {
@@ -4909,10 +4952,29 @@ document.querySelectorAll(".rail-item").forEach((b) => b.addEventListener("click
 document.querySelectorAll(".card .close").forEach((b) => b.addEventListener("click", () => { openPanels[mode].delete(b.closest(".card").id); syncPanels(); }));
 const panelOpen = (id) => uiDrawerOpen && openPanels[mode].has(id);
 function setMode(m) {
+  const keepClarify = openPanels[mode].has("clarify-card");
   mode = m;
+  if (keepClarify) openPanels[mode].add("clarify-card");
   document.querySelectorAll(".mode-switch button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
   $("now-mode").textContent = m === "auto" ? "AUTO" : "YOU";
   syncPanels();
+  uiSyncEps();
+}
+function uiSyncEps() {
+  const eps = $("app-eps");
+  const note = $("app-eps-note");
+  const off = mode === "interactive";
+  if (eps) eps.disabled = off;
+  if (note) note.hidden = !off;
+}
+const UI_VLM = { directVLM: 1, firstQ: 1, randomQ: 1, vlmQ: 1 };
+function uiPolicyLabel(p) {
+  if (!p) return "–";
+  return UI_VLM[p.id] ? p.label + " (sim.)" : p.label;
+}
+function uiPolicyRule(p) {
+  if (!p) return "";
+  return UI_VLM[p.id] ? p.rule + " Simulated." : p.rule;
 }
 document.querySelectorAll(".mode-switch button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
@@ -4935,17 +4997,18 @@ function uiSetNow(lane, label, cmd = "") {
 function renderPaperTable() {
   const rows = POLICIES.map((p) => {
     const o = PAPER.offline[p.id];
-    return `<tr><td>${p.label}</td><td>${fmt(o.acc)}</td><td>${fmt(o.asked)}</td><td>${o.qAsked == null ? "–" : fmt(o.qAsked)}</td><td data-twin="${p.id}">–</td></tr>`;
+    return `<tr><td>${uiPolicyLabel(p)}</td><td>${fmt(o.acc)}</td><td>${fmt(o.asked)}</td><td>${o.qAsked == null ? "–" : fmt(o.qAsked)}</td><td data-twin="${p.id}">–</td></tr>`;
   }).join("");
   $("report").innerHTML = `<h3 class="sec-h">Offline target resolution <em>paper: 216 trials per method</em></h3>
-    <table class="grid"><thead><tr><th>Policy</th><th>Acc %</th><th>Asked %</th><th>Q / asked</th><th>Twin acc %<span class="tag-sim">sim</span></th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="grid"><thead><tr><th>Policy</th><th>Acc %</th><th>Asked %</th><th>Q / asked</th><th>Twin acc % (sim, mean of seeds 1–5)</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="small-note">Paper: ${PAPER.ref} Twin numbers are simulated (rule-based questions, simulated perception) and are never the paper's results.</p>`;
 }
 renderPaperTable();
 
-const uiKindShort = { perceive: "see", resolved: "ok", unresolved: "stop", pregrasp: "pre", reobserve: "look" };
+const uiKindShort = { listen: "in", perceive: "see", answer: "yn", resolved: "ok", unresolved: "stop", grasp: "grip", pregrasp: "pre", descend: "down", close: "shut", lift: "up", retract: "back", reobserve: "look" };
+const uiKindTiny = { listen: "L", perceive: "S", ask: "Q", answer: "A", resolved: "R", unresolved: "X", grasp: "G", pregrasp: "P", descend: "D", close: "C", lift: "U", retract: "B", reobserve: "O" };
 const uiKindHex = {
-  listen: "#a8620c", perceive: "#7a4fc0", ask: "#0b8484", answer: "#2a8a3e",
+  listen: "#a8620c", perceive: "#7a4fc0", ask: "#0b8484", answer: "#e0922a",
   resolved: "#2a8a3e", unresolved: "#c8312b", grasp: "#3550c8", pregrasp: "#3550c8",
   descend: "#8a6d1f", close: "#c4531a", lift: "#0b8484", retract: "#5f6670", reobserve: "#7a4fc0",
 };
@@ -4961,12 +5024,19 @@ function uiCell(v) {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, "\"\"")}"` : s;
 }
 function uiCsv() {
-  const head = ["scene", "instruction", "type", "policy", "eps", "K", "S0", "questions", "outcome", "resolved", "target"];
+  const head = ["scene", "instruction", "type", "policy", "eps", "K", "seed", "mode", "S0", "questions", "outcome", "resolved", "target"];
   const lines = [head.join(",")];
   for (const row of appLog) {
-    lines.push([row.scene, row.instruction, row.type, row.policy, row.eps, row.K, row.S0, row.questions, row.outcome, row.resolved, row.target].map(uiCell).join(","));
+    lines.push([row.scene, row.instruction, row.type, row.policy, row.eps, row.K, row.seed, row.mode, row.S0, row.questions, row.outcome, row.resolved, row.target].map(uiCell).join(","));
   }
   return lines.join("\n");
+}
+function uiOutcomeLine(shown) {
+  if (shown.outcome === "none" && mode === "interactive") {
+    const line = "resolved; no hidden target was set (click an object before answering to score the trial)";
+    return shown.belief ? line + " · " + shown.belief : line;
+  }
+  return shown.belief ? shown.outcome + " · " + shown.belief : shown.outcome;
 }
 function uiPaint() {
   const shown = appShown || {};
@@ -4994,14 +5064,17 @@ function uiPaint() {
       const py = n ? p.count.yes / n : 0;
       const pn = n ? p.count.no / n : 0;
       const on = !!(sel && (p === sel || p.key === sel.key));
-      const flags = p.valid || {};
+      const flags = p.raw || p.valid || {};
       const flag = (ok, name, title) => `<span class="flag ${ok ? "on" : "off"}" title="${title}">${name}</span>`;
-      rows += `<tr class="${on ? "sel" : ""}"><td class="q">${on ? `<span class="star">★</span> ` : ""}${uiEsc(p.text)}</td>`
+      const badge = p.fallback
+        ? ` <span class="flag repair" title="fallback partition; the key is only a label">fallback</span>`
+        : (p.repaired ? ` <span class="flag repair" title="repaired after a validity check failed">repaired</span>` : "");
+      rows += `<tr class="${on ? "sel" : ""}"><td class="q">${on ? `<span class="star">★</span> ` : ""}${uiEsc(p.text)}${badge}</td>`
         + `<td>${p.count ? p.count.yes : "–"}</td><td>${p.count ? p.count.no : "–"}</td>`
         + `<td>${n ? py.toFixed(3) : "–"}</td><td>${n ? pn.toFixed(3) : "–"}</td><td>${fmt(p.G, 3)}</td>`
         + `<td class="flags">${flag(flags.exhaustive, "E", "exhaustive")}${flag(flags.disjoint, "D", "disjoint")}${flag(flags.legal, "L", "legal")}${flag(flags.wording, "W", "wording")}</td></tr>`;
     }
-    table.innerHTML = `<thead><tr><th>Question</th><th title="yes branch">Y</th><th title="no branch">N</th><th title="p yes">p<sub>y</sub></th><th title="p no">p<sub>n</sub></th><th>G</th><th title="exhaustive, disjoint, legal, wording">Valid</th></tr></thead><tbody>${rows || `<tr><td class="q">No proposal this round.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`}</tbody>`;
+    table.innerHTML = `<thead><tr><th>Question</th><th title="yes branch">Y</th><th title="no branch">N</th><th title="p yes">p<sub>y</sub></th><th title="p no">p<sub>n</sub></th><th>G</th><th title="exhaustive, disjoint, legal, wording, before repair">Raw</th></tr></thead><tbody>${rows || `<tr><td class="q">No proposal this round.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`}</tbody>`;
   }
   const hist = $("ui-hist");
   if (hist) {
@@ -5014,18 +5087,21 @@ function uiPaint() {
   if (say) {
     const asking = (shown.phase === "ask" || shown.phase === "answer") && shown.sel;
     say.hidden = false;
+    const polNow = POLICIES.find((p) => p.id === appPolicy);
     if (asking) say.innerHTML = `<small>robot asks</small>${uiEsc(shown.sel.text)}`;
-    else if (appInstr) say.innerHTML = `<small>${uiEsc(appInstr.type)} · ${uiEsc(appPolicy)}</small>${uiEsc(appInstr.text)}`;
+    else if (appInstr) say.innerHTML = `<small>${uiEsc(appInstr.type)} · ${uiEsc(polNow ? uiPolicyLabel(polNow) : appPolicy)}</small>${uiEsc(appInstr.text)}`;
     else say.hidden = true;
   }
   const answers = $("ui-answer");
   if (answers) answers.hidden = !(mode === "interactive" && shown.pending);
+  const yn = $("ui-yn");
+  if (yn) yn.hidden = !(mode === "interactive" && shown.pending && uiNarrow.matches);
   const out = $("ui-outcome");
   if (out) {
     if (shown.outcome) {
       out.hidden = false;
       out.className = "outcome " + shown.outcome;
-      out.textContent = shown.belief ? `${shown.outcome} · ${shown.belief}` : shown.outcome;
+      out.textContent = uiOutcomeLine(shown);
     } else {
       out.hidden = true;
       out.textContent = "";
@@ -5037,6 +5113,12 @@ function uiPaint() {
       ? (appTargetChosen ? "Hidden target set." : "Click an object to set the hidden target.")
       : "Hidden target: drawn from the instruction's matches.";
   }
+  const polNote = $("app-policy-note");
+  if (polNote) {
+    const info = POLICIES.find((p) => p.id === appPolicy);
+    polNote.hidden = !(info && !info.clarifies);
+  }
+  uiSyncEps();
   uiPaintLive();
   uiPaintCam();
   uiPaintGrasp();
@@ -5048,12 +5130,13 @@ function uiPaintLive() {
   const pol = POLICIES.find((p) => p.id === appPolicy);
   const outcome = (appShown && appShown.outcome) || "in progress";
   const questions = appShown ? appShown.questions : 0;
+  const epsLine = mode === "interactive" ? "ε not applied · seed " + appSeed : "ε " + Number(appEps).toFixed(2) + " · seed " + appSeed;
   host.innerHTML = `<div class="stat"><small>Scene</small><div class="value sm">${uiEsc(appSceneId || "–")}</div><div class="sub">${uiEsc(appPlaced ? appPlaced.family : "")} · ${uiEsc(appSet || "")}</div></div>`
     + `<div class="stat"><small>Instruction</small><div class="value sm">${uiEsc(ins ? ins.type : "–")}</div><div class="sub">|S0| = ${appCands.length}</div></div>`
-    + `<div class="stat"><small>Questions</small><div class="value">${questions}</div><div class="sub">${uiEsc(outcome)}</div></div>`
-    + `<div class="stat"><small>Policy</small><div class="value sm">${uiEsc(pol ? pol.label : appPolicy || "–")}</div><div class="sub">${uiEsc(pol ? pol.rule : "")}</div></div>`
+    + `<div class="stat"><small>Questions</small><div class="value">${questions}</div><div class="sub">${uiEsc(outcome === "none" && mode === "interactive" ? "no target set" : outcome)}</div></div>`
+    + `<div class="stat"><small>Policy</small><div class="value sm">${uiEsc(pol ? uiPolicyLabel(pol) : appPolicy || "–")}</div><div class="sub">${uiEsc(pol ? uiPolicyRule(pol) : "")}</div></div>`
     + `<div class="stat"><small>τ</small><div class="value">${PARAMS.tau}</div><div class="sub">text ${PARAMS.textThr} · NMS ${PARAMS.nmsIoU}</div></div>`
-    + `<div class="stat"><small>K</small><div class="value">${appK}</div><div class="sub">ε ${Number(appEps).toFixed(2)} · seed ${appSeed}</div></div>`;
+    + `<div class="stat"><small>K</small><div class="value">${appK}</div><div class="sub">${uiEsc(epsLine)}</div></div>`;
   const sub = $("live-sub");
   if (sub) sub.textContent = appShown && appShown.phase ? appShown.phase : "";
 }
@@ -5070,7 +5153,14 @@ function uiPaintGrasp() {
   const host = $("grasp");
   if (!host) return;
   if (!appWillGrasp) {
-    host.innerHTML = `<p class="outcome unresolved">not executed</p><p class="small-note">Wrong or unresolved targets are not executed. The operator verifies the target first (Sec. 4.3).</p>`;
+    const outcome = (appShown && appShown.outcome) || "";
+    if (outcome === "none") {
+      host.innerHTML = `<p class="outcome none">not executed</p><p class="small-note">No hidden target was set, so the robot does not grasp.</p>`;
+    } else if (outcome === "correct") {
+      host.innerHTML = `<p class="outcome correct">not executed</p><p class="small-note">The target is correct. Grasp motion is not in this build.</p>`;
+    } else {
+      host.innerHTML = `<p class="outcome unresolved">not executed</p><p class="small-note">Wrong or unresolved targets are not executed. The operator verifies the target first (Sec. 4.3).</p>`;
+    }
     return;
   }
   const belief = appShown && appShown.belief ? appShown.belief : "Resolved target.";
@@ -5111,9 +5201,11 @@ function uiDrawLanes() {
     g.fill();
     g.font = `600 ${Math.round(11 * dpr)}px "IBM Plex Sans", sans-serif`;
     const brief = uiKindShort[s.kind];
+    const tiny = uiKindTiny[s.kind];
     const pad = 8 * dpr;
     const text = g.measureText(s.kind).width + pad <= bw ? s.kind
-      : (brief && g.measureText(brief).width + pad <= bw ? brief : "");
+      : (brief && g.measureText(brief).width + pad <= bw ? brief
+        : (tiny && g.measureText(tiny).width + 4 * dpr <= bw ? tiny : ""));
     if (text) {
       g.save();
       g.beginPath();
@@ -5190,6 +5282,10 @@ function uiBindChrome() {
   const yes = $("ui-yes"), no = $("ui-no");
   if (yes) yes.addEventListener("click", () => appAnswer("yes"));
   if (no) no.addEventListener("click", () => appAnswer("no"));
+  const ynYes = $("ui-yn-yes"), ynNo = $("ui-yn-no");
+  if (ynYes) ynYes.addEventListener("click", () => appAnswer("yes"));
+  if (ynNo) ynNo.addEventListener("click", () => appAnswer("no"));
+  uiNarrow.addEventListener("change", () => uiPaint());
 }
 function uiThemeChanged() { uiDrawLanes(); }
 queueMicrotask(() => { uiBindChrome(); uiFitLanes(); });
@@ -5225,6 +5321,7 @@ let appSegs = [];
 let appGroups = new Map();
 let appLog = [];
 let appLogRow = null;
+let appSnap = null;
 let appWillGrasp = false;
 let appHasWaypoints = false;
 let appPlan = null;
@@ -5475,7 +5572,9 @@ function appApplyNow(seg) {
     uiSetNow("say", "–");
     uiSetNow("user", seg.label === "yes" ? "Yes" : "No", "answer");
   } else if (seg.kind === "resolved") {
-    uiSetNow("robot", "Resolved", appTrial && appTrial.resolved ? appTrial.resolved : "");
+    const id = appTrial && appTrial.resolved;
+    const cand = id ? appCand(id) : null;
+    uiSetNow("robot", "Resolved", cand ? String(cand.disp) : "");
     uiSetNow("say", appBelief() || "resolved", "say");
     uiSetNow("user", "–");
   } else if (seg.kind === "unresolved") {
@@ -5539,10 +5638,27 @@ function appSyncInteractive() {
   uiPaint();
 }
 
+function appSnapshot() {
+  appSnap = {
+    scene: appSceneId,
+    instruction: appInstr ? appInstr.text : "",
+    type: appInstr ? appInstr.type : "",
+    policy: appPolicy,
+    eps: appEps,
+    K: appK,
+    seed: appSeed,
+    mode,
+    S0: appCands.length,
+  };
+}
+
 function appRowFromTrial(tr) {
+  const s = appSnap || {};
   return {
-    scene: appSceneId, instruction: appInstr ? appInstr.text : "", type: appInstr ? appInstr.type : "",
-    policy: appPolicy, eps: appEps, K: appK, S0: appCands.length,
+    scene: s.scene || "", instruction: s.instruction || "", type: s.type || "",
+    policy: s.policy || "", eps: s.eps == null ? "" : s.eps, K: s.K == null ? "" : s.K,
+    seed: s.seed == null ? "" : s.seed, mode: s.mode || mode,
+    S0: s.S0 == null ? 0 : s.S0,
     questions: tr ? tr.questions : 0, outcome: tr ? tr.outcome : "",
     resolved: tr && tr.resolved ? tr.resolved : "", target: appTarget || "",
   };
@@ -5554,11 +5670,11 @@ function appRecord(row) {
 }
 
 function appDropPartial() {
-  if (mode !== "interactive" || appIxLogged || !appRounds.length || !appInstr) return;
+  if (!appSnap || appSnap.mode !== "interactive" || appIxLogged || !appRounds.length) return;
   appRecord({
-    scene: appSceneId, instruction: appInstr.text, type: appInstr.type, policy: appPolicy,
-    eps: appEps, K: appK, S0: appCands.length, questions: appRounds.length,
-    outcome: "unresolved", resolved: "", target: appTarget || "",
+    scene: appSnap.scene, instruction: appSnap.instruction, type: appSnap.type, policy: appSnap.policy,
+    eps: appSnap.eps, K: appSnap.K, seed: appSnap.seed, mode: appSnap.mode, S0: appSnap.S0,
+    questions: appRounds.length, outcome: "unresolved", resolved: "", target: appTarget || "",
   });
   appIxLogged = true;
 }
@@ -5566,6 +5682,7 @@ function appDropPartial() {
 function appRunAuto() {
   appTarget = appDrawTarget(appInstr, appSeed);
   appTargetChosen = true;
+  appSnapshot();
   appIxDone = true;
   appIxLogged = true;
   appTrial = runTrial(appPlaced, appInstr, appTarget, appPolicy, { seed: appSeed, eps: appEps, K: appK });
@@ -5590,7 +5707,10 @@ function appDirectResolved() {
 function appAskNext() {
   const roundSeed = (appSeed + (appRounds.length + 1) * 0x9e3779b1) >>> 0 || 1;
   const hist = [];
-  for (let i = 0; i < appRounds.length; i++) hist.push(appRounds[i].sel.key);
+  for (let i = 0; i < appRounds.length; i++) {
+    hist.push(appRounds[i].sel.key);
+    if (appRounds[i].sel.text) hist.push(appRounds[i].sel.text);
+  }
   appProps = proposeQuestions(appS, appCands, appPlaced, hist, { K: appK, seed: roundSeed, slip: 0.05 });
   appPending = selectProp(appPolicy, appProps, roundSeed);
   if (appPending) appMaybeSpeak(appPending.text);
@@ -5623,7 +5743,7 @@ function appFinishInteractive() {
   if (fromStart) { seek(0); setPlaying(true); }
   else if (appWillGrasp) { seek(resolvedT0); setPlaying(true); }
   else { seek(resolvedT0); setPlaying(false); }
-  appSyncInteractive();
+  appSyncAuto(time);
   appApplyNow(appSegAt(time));
   appLastSeg = appSegAt(time);
   uiDrawLanes();
@@ -5632,6 +5752,7 @@ function appFinishInteractive() {
 function appStartInteractive() {
   appTarget = null;
   appTargetChosen = false;
+  appSnapshot();
   appTrial = null;
   appIxDone = false;
   appIxLogged = false;
@@ -5683,16 +5804,42 @@ function appAnswer(ans) {
   uiDrawLanes();
 }
 
+function appRetimeline(playGrasp) {
+  appClearGraspTick();
+  appSegs = appComposeAuto(appTrial);
+  setTimeline(appSegs);
+  setStretch({ ...appHomeQ });
+  uiDrawLanes();
+  if (playGrasp && appWillGrasp) {
+    let t0 = 0;
+    for (let i = 0; i < appSegs.length; i++) if (appGraspKind(appSegs[i].kind)) { t0 = appSegs[i].t0; break; }
+    seek(t0);
+    setPlaying(true);
+  } else if (!appWillGrasp) {
+    let t0 = 0;
+    for (let i = 0; i < appSegs.length; i++) if (appSegs[i].kind === "resolved" || appSegs[i].kind === "unresolved") t0 = appSegs[i].t0;
+    seek(t0);
+    setPlaying(false);
+  }
+  appSyncAuto(time);
+  appApplyNow(appSegAt(time));
+  appLastSeg = appSegAt(time);
+}
+
 function appChooseTarget(id) {
   if (mode !== "interactive") return;
   appTarget = id;
   appTargetChosen = true;
   if (appIxDone && appTrial && appTrial.resolved) {
     const c = appCand(appTrial.resolved);
-    appTrial.outcome = c && c.obj === id ? "correct" : "wrong";
+    const outcome = c && c.obj === id ? "correct" : "wrong";
+    const prev = appTrial.outcome;
+    const hadGrasp = appWillGrasp;
+    appTrial.outcome = outcome;
     appTrial.target = id;
-    if (appLogRow) { appLogRow.outcome = appTrial.outcome; appLogRow.target = id; }
-    appSyncInteractive();
+    if (appLogRow) { appLogRow.outcome = outcome; appLogRow.target = id; }
+    if (outcome !== prev || (outcome === "correct") !== hadGrasp) appRetimeline(outcome === "correct" && !hadGrasp);
+    else appSyncAuto(time);
     return;
   }
   const note = $("app-target-note");
@@ -5758,6 +5905,8 @@ function appReadForm() {
   appK = Math.min(5, Math.max(1, Math.round(Number($("app-k").value) || 4)));
   const seed = Math.round(Number($("app-seed").value));
   appSeed = Number.isFinite(seed) && seed >= 1 ? seed : 1;
+  const seedEl = $("app-seed");
+  if (seedEl) seedEl.value = String(appSeed);
   appSpeech = !!($("app-speech") && $("app-speech").checked);
 }
 
@@ -5787,8 +5936,8 @@ function appFillPolicies() {
     if (set === "online" && !p.online) continue;
     const o = document.createElement("option");
     o.value = p.id;
-    o.textContent = p.label;
-    o.title = p.rule;
+    o.textContent = uiPolicyLabel(p);
+    o.title = uiPolicyRule(p);
     sel.appendChild(o);
   }
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
@@ -5846,6 +5995,7 @@ function appOnForm(e) {
   }
   appReadForm();
   appShowRanges();
+  if (t && (t.tagName === "SELECT" || (t.tagName === "INPUT" && (t.type === "range" || t.type === "number")))) t.blur();
   appRebuild();
 }
 
@@ -5893,7 +6043,12 @@ function appBindPointer() {
 
 function appOnKey(e) {
   if (mode !== "interactive" || e.repeat) return;
-  if (e.target && e.target.closest && e.target.closest("input, select, textarea")) return;
+  const t = e.target;
+  if (t && t.tagName === "TEXTAREA") return;
+  if (t && t.tagName === "INPUT") {
+    const ty = (t.type || "text").toLowerCase();
+    if (ty !== "range" && ty !== "checkbox" && ty !== "radio" && ty !== "button") return;
+  }
   if (e.key === "y" || e.key === "Y") { e.preventDefault(); appAnswer("yes"); }
   else if (e.key === "n" || e.key === "N") { e.preventDefault(); appAnswer("no"); }
 }
@@ -5907,7 +6062,7 @@ function appTick(t) {
   if (seg === appLastSeg) return;
   appLastSeg = seg;
   appApplyNow(seg);
-  if (mode === "auto") appSyncAuto(t);
+  if (mode === "auto" || (mode === "interactive" && appIxDone)) appSyncAuto(t);
 }
 
 function appBoot() {
@@ -5944,12 +6099,18 @@ setMode = function (m) {
   appSetMode(m);
   if (appReady) appRebuild();
 };
+const appSetPlaying = setPlaying;
+setPlaying = function (on) {
+  if (on && time >= DURATION && !$("loop").checked) seek(0);
+  appSetPlaying(on);
+};
 
 queueMicrotask(appBoot);
 // ================================================================ head camera (prefix hc)
 // Renders stretchHeadCam() into #cam-canvas at <= 5 Hz while the Camera panel is open.
-// Cand.box is the perception pinhole (CAM_POSE). The check projects each object centre
-// with this same three.js camera and requires it inside that box.
+// Cand.box is the perception pinhole (CAM_POSE). The check projects each object's
+// 3D box with this three.js camera and requires IoU >= 0.8. A shifted or oversized
+// box must fail. Number tags keep a constant pixel size and sit above the object.
 
 let hcCam = null;
 let hcTarget = null;
@@ -5967,6 +6128,12 @@ const hcLook = new THREE.Vector3();
 const hcTmp = new THREE.Vector3();
 const hcVp = new THREE.Vector4();
 const hcSc = new THREE.Vector4();
+const hcLift = new Float64Array(128);
+const hcPx = new Float64Array(128);
+const hcPy = new Float64Array(128);
+const hcPw = new Float64Array(128);
+const hcLab = [];
+for (let i = 0; i < 32; i++) hcLab.push({ x: 0, y: 0, w: 0, h: 0 });
 
 function hcAim() {
   const h = stretchHeadCam();
@@ -6002,15 +6169,17 @@ function hcMakeSprite(disp) {
   tex.generateMipmaps = false;
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false });
   const s = new THREE.Sprite(mat);
-  s.scale.set(0.09, 0.09, 1);
+  s.scale.set(0.02, 0.02, 1);
+  s.center.set(0.5, 0);
   s.renderOrder = 20;
   s.castShadow = false;
   s.receiveShadow = false;
   s.name = "tag-c" + disp;
   s.userData.appSprite = true;
   s.userData.hcDisp = disp;
+  s.userData.hcBase = new THREE.Vector3();
   return s;
 }
 
@@ -6032,11 +6201,93 @@ function hcRebuildTags() {
     if (!o || !group) continue;
     const s = hcMakeSprite(c.disp);
     // Scene space, not under world: a sprite parented to the -90° cell frame
-    // lies flat and casts a square shadow across the cup.
-    const z = TABLE.h + dimsOf(o).h + 0.08;
-    s.position.set(o.x, z, -o.y);
+    // lies flat and casts a square shadow across the cup. The anchor is the
+    // object top; hcLayoutTags lifts the disc above the screen box.
+    const z = TABLE.h + dimsOf(o).h;
+    s.userData.hcObj = o;
+    s.userData.hcBase.set(o.x, z, -o.y);
+    s.position.copy(s.userData.hcBase);
     scene.add(s);
     hcTags.push(s);
+  }
+}
+
+function hcScreenTop(o, w, h) {
+  const d = dimsOf(o);
+  const hx = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.l / 2;
+  const hy = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.w / 2;
+  const yaw = o.yaw || 0;
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  let top = Infinity, n = 0;
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [0, 1]) {
+    const lx = sx * hx, ly = sy * hy;
+    hcTmp.set(o.x + c * lx - s * ly, TABLE.h + sz * d.h, -(o.y + s * lx + c * ly));
+    hcTmp.project(camera);
+    if (hcTmp.z < -1 || hcTmp.z > 1) continue;
+    const v = (0.5 - hcTmp.y * 0.5) * h;
+    if (v < top) top = v;
+    n++;
+  }
+  return n ? top : null;
+}
+
+function hcTagOverlap(i, j) {
+  const iw = hcPw[i], jw = hcPw[j];
+  const ix0 = hcPx[i] - iw * 0.5, ix1 = hcPx[i] + iw * 0.5;
+  const iy1 = hcPy[i] - hcLift[i] * iw, iy0 = iy1 - iw;
+  const jx0 = hcPx[j] - jw * 0.5, jx1 = hcPx[j] + jw * 0.5;
+  const jy1 = hcPy[j] - hcLift[j] * jw, jy0 = jy1 - jw;
+  return ix0 < jx1 - 2 && ix1 > jx0 + 2 && iy0 < jy1 - 2 && iy1 > jy0 + 2;
+}
+
+function hcLayoutTags() {
+  const n = hcTags.length;
+  if (!n || n > hcLift.length) return;
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  if (w < 2 || h < 2) return;
+  const k = 2 * Math.tan((camera.fov * Math.PI) / 360) / h;
+  for (let i = 0; i < n; i++) {
+    const s = hcTags[i];
+    const px = appHot === s.userData.hcDisp ? 32 : 26;
+    hcPw[i] = px;
+    const sc = px * k;
+    if (s.scale.x !== sc) s.scale.set(sc, sc, 1);
+    const o = s.userData.hcObj;
+    const top = o ? hcScreenTop(o, w, h) : null;
+    hcTmp.copy(s.userData.hcBase);
+    hcTmp.project(camera);
+    if (hcTmp.z < -1 || hcTmp.z > 1) {
+      s.visible = false;
+      hcPx[i] = -9999;
+      hcLift[i] = 0;
+      continue;
+    }
+    s.visible = true;
+    const u = (hcTmp.x * 0.5 + 0.5) * w;
+    const v = (0.5 - hcTmp.y * 0.5) * h;
+    hcPx[i] = u;
+    hcPy[i] = v;
+    const clear = top == null ? 0 : Math.max(0, (v - top) / px);
+    hcLift[i] = clear + 4 / px;
+  }
+  for (let pass = 0; pass < 10; pass++) {
+    let hit = false;
+    for (let i = 0; i < n; i++) {
+      if (hcPx[i] < -1000) continue;
+      for (let j = 0; j < i; j++) {
+        if (hcPx[j] < -1000) continue;
+        if (!hcTagOverlap(i, j)) continue;
+        const up = hcPy[i] >= hcPy[j] ? i : j;
+        hcLift[up] += 0.55;
+        hit = true;
+      }
+    }
+    if (!hit) break;
+  }
+  for (let i = 0; i < n; i++) {
+    if (hcLift[i] > 6) hcLift[i] = 6;
+    const s = hcTags[i];
+    if (s.center.y !== -hcLift[i]) s.center.set(0.5, -hcLift[i]);
   }
 }
 
@@ -6049,8 +6300,8 @@ function hcSyncTags() {
     const opacity = alive ? 1 : 0.28;
     if (s.material.opacity !== opacity) s.material.opacity = opacity;
     s.material.color.setHex(alive ? 0xffffff : 0x9a9a9a);
-    const sc = hot ? 0.11 : 0.09;
-    if (s.scale.x !== sc) s.scale.set(sc, sc, 1);
+    if (hot) s.renderOrder = 21;
+    else s.renderOrder = 20;
   }
 }
 
@@ -6073,10 +6324,23 @@ function hcBlit() {
   hcCtx.putImageData(hcImg, 0, 0);
 }
 
+function hcLabelHit(x, y, w, h, n) {
+  for (let i = 0; i < n; i++) {
+    const r = hcLab[i];
+    if (x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y) return true;
+  }
+  return false;
+}
+
 function hcDrawBoxes() {
   const g = hcCtx;
-  g.font = "600 15px sans-serif";
+  const canvas = $("cam-canvas");
+  const shown = canvas ? canvas.clientWidth : CAM.w;
+  const fontPx = Math.max(22, Math.round(14 * CAM.w / Math.max(80, shown || CAM.w)));
+  const lh = fontPx + 6;
+  g.font = "600 " + fontPx + "px sans-serif";
   g.textBaseline = "alphabetic";
+  let placed = 0;
   for (let i = 0; i < appCands.length; i++) {
     const c = appCands[i];
     const b = c.box;
@@ -6090,12 +6354,26 @@ function hcDrawBoxes() {
     g.strokeRect(x, y, w, h);
     const text = hcLabels[i] || String(c.disp);
     const tw = g.measureText(text).width;
-    const ly = y >= 20 ? y - 18 : y + 2;
+    const bw = tw + 10;
+    let lx = x;
+    let ly = y >= lh + 2 ? y - lh : y + 2;
+    for (let k = 0; k < 6 && hcLabelHit(lx, ly, bw, lh, placed); k++) {
+      if (k % 2 === 0) ly += lh + 2;
+      else lx += 8;
+    }
+    if (ly + lh > CAM.h) ly = Math.max(0, CAM.h - lh);
     g.setLineDash(hcSolid);
     g.fillStyle = !alive ? "rgba(60,60,60,0.8)" : "rgba(20,16,14,0.82)";
-    g.fillRect(x, ly, tw + 8, 16);
+    g.fillRect(lx, ly, bw, lh);
     g.fillStyle = "#ffffff";
-    g.fillText(text, x + 4, ly + 13);
+    g.fillText(text, lx + 5, ly + fontPx);
+    if (placed < hcLab.length) {
+      hcLab[placed].x = lx;
+      hcLab[placed].y = ly;
+      hcLab[placed].w = bw;
+      hcLab[placed].h = lh;
+      placed++;
+    }
   }
 }
 
@@ -6131,40 +6409,75 @@ function hcRender() {
 }
 
 function hcTick() {
-  if (!hcCam || !panelOpen("camera-card")) return;
-  hcRender();
+  if (hcCam && panelOpen("camera-card")) hcRender();
+  hcLayoutTags();
+}
+
+function hcIoU(a, b) {
+  const x0 = Math.max(a[0], b[0]), y0 = Math.max(a[1], b[1]);
+  const x1 = Math.min(a[2], b[2]), y1 = Math.min(a[3], b[3]);
+  const iw = x1 - x0, ih = y1 - y0;
+  if (iw <= 0 || ih <= 0) return 0;
+  const inter = iw * ih;
+  const aa = Math.max(0, a[2] - a[0]) * Math.max(0, a[3] - a[1]);
+  const bb = Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+  const uni = aa + bb - inter;
+  return uni <= 0 ? 0 : inter / uni;
+}
+
+function hcProjectBox(o) {
+  const d = dimsOf(o);
+  const hx = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.l / 2;
+  const hy = (o.cat === "cup" || o.cat === "bottle") ? d.d / 2 : d.w / 2;
+  const yaw = o.yaw || 0;
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  let u0 = Infinity, v0 = Infinity, u1 = -Infinity, v1 = -Infinity, n = 0;
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [0, 1]) {
+    const lx = sx * hx, ly = sy * hy;
+    hcTmp.set(o.x + c * lx - s * ly, TABLE.h + sz * d.h, -(o.y + s * lx + c * ly));
+    hcTmp.project(hcCam);
+    if (hcTmp.z < -1 || hcTmp.z > 1) continue;
+    const u = (hcTmp.x * 0.5 + 0.5) * CAM.w;
+    const v = (0.5 - hcTmp.y * 0.5) * CAM.h;
+    n++;
+    if (u < u0) u0 = u;
+    if (v < v0) v0 = v;
+    if (u > u1) u1 = u;
+    if (v > v1) v1 = v;
+  }
+  return n ? [u0, v0, u1, v1] : null;
 }
 
 function hcCheckBoxes() {
   if (!hcCam) return { ok: false, detail: "head camera is not ready" };
   if (!appCands.length) return { ok: true, detail: "no candidates" };
   hcAim();
-  let worst = 0, bad = 0;
+  let minIoU = 1, bad = 0, worstShift = 0, worstBig = 0;
   const bits = [];
   for (let i = 0; i < appCands.length; i++) {
     const c = appCands[i];
     const o = appObj(c.obj);
-    if (!o || !c.box) { bad++; bits.push(c.id + " missing"); continue; }
-    const z = TABLE.h + dimsOf(o).h * 0.5;
-    hcTmp.set(o.x, z, -o.y);
-    hcTmp.project(hcCam);
-    const u = (hcTmp.x * 0.5 + 0.5) * CAM.w;
-    const v = (0.5 - hcTmp.y * 0.5) * CAM.h;
+    const proj = o ? hcProjectBox(o) : null;
+    if (!o || !c.box || !proj) { bad++; bits.push(c.id + " missing"); continue; }
+    const iou = hcIoU(proj, c.box);
+    if (iou < minIoU) minIoU = iou;
     const b = c.box;
-    const du = u < b[0] ? b[0] - u : (u > b[2] ? u - b[2] : 0);
-    const dv = v < b[1] ? b[1] - v : (v > b[3] ? v - b[3] : 0);
-    const out = Math.hypot(du, dv);
-    if (out > worst) worst = out;
-    const behind = hcTmp.z < -1 || hcTmp.z > 1;
-    if (behind || out > 3) {
-      bad++;
-      bits.push(c.id + " (" + u.toFixed(0) + "," + v.toFixed(0) + ") off " + out.toFixed(1) + "px");
-    }
+    const bw = b[2] - b[0], bh = b[3] - b[1];
+    const shift = Math.max(30, Math.min(bw, bh) * 0.5);
+    const shifted = [b[0] + shift, b[1] + shift, b[2] + shift, b[3] + shift];
+    const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    const big = [cx - bw * 1.5, cy - bh * 1.5, cx + bw * 1.5, cy + bh * 1.5];
+    const si = hcIoU(proj, shifted), bi = hcIoU(proj, big);
+    if (si > worstShift) worstShift = si;
+    if (bi > worstBig) worstBig = bi;
+    if (iou < 0.8) { bad++; bits.push(c.id + " IoU " + iou.toFixed(2)); }
+    if (si >= 0.8 || bi >= 0.8) { bad++; bits.push(c.id + " control still passes"); }
   }
-  return {
-    ok: bad === 0,
-    detail: bad ? bits.join("; ") : appCands.length + " centres inside, max outside " + worst.toFixed(2) + " px",
-  };
+  const ok = bad === 0;
+  const detail = ok
+    ? appCands.length + " boxes, min IoU " + minIoU.toFixed(2) + "; shift IoU " + worstShift.toFixed(2) + "; oversized IoU " + worstBig.toFixed(2)
+    : bits.join("; ");
+  return { ok, detail };
 }
 
 function hcBoot() {
