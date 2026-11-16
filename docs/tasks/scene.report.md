@@ -35,6 +35,7 @@
 - `wheelDiameter` 0.1016 m (4 inch, hardware guide) is extra, used by the wheels.
 - `q.x` is not clamped. The twin base slides along the table; Stretch has no matching prismatic stop.
 - The eight demo objects are placed by hand. They do not go through `layoutScene`.
+- Object axes follow the lead's footprint convention (main `footprintDiscs`): cups and bottles are lathed about local z, a cup handle bulges along local +x by about 2 cm (the handle spur in the disc radius), a fork or spoon lies flat with length along local x and tines or bowl toward +x. Gallery yaw of π/2 only turns that local +x onto cell +y.
 - `clear` and `material: "glass"` use a transmissive `MeshPhysicalMaterial`. Ceramic is clearcoat, plastic is satin, metal uses `brushRough`, anything else is matte paper.
 
 ## Open questions

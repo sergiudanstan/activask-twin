@@ -1,6 +1,8 @@
 // ================================================================ tabletop objects
 // makeObject(o) -> THREE.Group named o.id. Origin at the base centre, cell frame, z up.
 // The caller sets x, y, TABLE.h and yaw. objGallery() fills the table when the URL has ?gallery.
+// Local axes match footprintDiscs: cups and bottles are round about z, a cup handle points along +x,
+// a fork or spoon lies flat with its length along x and its tines or bowl toward +x (yaw 0 = cell +x).
 const objRoot = moduleRoot("objects");
 
 const OBJ_COLORS = Object.freeze({
@@ -239,7 +241,7 @@ function objGallery() {
   for (const size of ATTRS.size) add({ cat: "spoon", size, color: size === "large" ? "pink" : "grey", material: size === "small" ? "plastic" : "metal", yaw: Math.PI / 2 });
   add({ cat: "cup", size: "small", color: "black", material: "metal", handle: true, yaw: 0.4 });
   add({ cat: "spoon", size: "medium", color: "yellow", material: "plastic", yaw: 0.4 });
-  // 3 rows. Utensils lie along y (yaw π/2) so the row pitch can stay inside the table.
+  // 3 rows. yaw π/2 turns local +x onto cell +y so the utensils fit the row pitch.
   const rows = [-0.20, 0.02, 0.22];
   const per = Math.ceil(items.length / rows.length);
   items.forEach((o, i) => {
