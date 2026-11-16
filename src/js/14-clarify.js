@@ -257,23 +257,11 @@ function clSample(pool, K, r) {
   return arr.slice(0, n);
 }
 
-// TODO-SOURCE: the paper says the VLM proposes K questions; it does not say they are a uniform subset.
-// A uniform draw of K often misses every balanced split, and ActivAsk then cannot approach the published
-// question counts (2.700 vs ideal 2.667 at |S0| = 6). When the full pool has a maximally balanced
-// partition and the draw missed all of them, swap it into the last slot. ActivAsk still chooses only
-// inside the K it is shown.
-function clKeepBalance(pool, chosen) {
-  if (!pool.length || !chosen.length) return chosen;
-  let best = pool[0];
-  for (const p of pool) {
-    if (clImb(p) < clImb(best) || (clImb(p) === clImb(best) && p.key < best.key)) best = p;
-  }
-  if (chosen.some((p) => clImb(p) === clImb(best))) return chosen;
-  const next = chosen.slice();
-  next[next.length - 1] = best;
-  return next;
-}
-
+// TODO-SOURCE: the paper says the VLM proposes K questions; it does not say how they are distributed. The twin
+// draws K distinct partitions uniformly from the enumerated pool (simulated VLM diversity). ActivAsk chooses only
+// inside the K it is shown, so a larger K raises the chance of a balanced split (paper Sec. 5.3: the mean minimum
+// EFE falls as K grows). An earlier version swapped the most balanced partition into every draw; that made K
+// irrelevant (flat K sweep) and changed ActivAsk's questions on asked trials by only 0.007, so it was removed.
 function clSlip(p, S, r) {
   const kind = Math.floor(r() * 3);
   if (kind === 0 && S.length) {
@@ -287,7 +275,10 @@ function clSlip(p, S, r) {
   return { text: "Is it " + (S[0] || "c1") + "?", key: p.key, yes: p.yes.slice(), no: p.no.slice() };
 }
 
-// K proposals drawn with rng. history is a list of keys already asked; those partitions are not offered again.
+// K proposals drawn with rng. history lists the keys AND texts already asked: an asked partition is not offered
+// again, and a new partition whose wording was already used (two split points both read "Is it on the near
+// side?") is reworded relative to the remaining candidates ("Of the ones left, ..."), so the dialogue never
+// repeats a question (Sec. 3.4.1: dialogue history avoids repeating answered questions).
 // slip (default 0 here; runTrial defaults to 0.05) drops a candidate, duplicates one, or leaks an id, then repairs.
 function proposeQuestions(S, cands, scene, history, opts) {
   const opt = opts || {};
@@ -300,7 +291,7 @@ function proposeQuestions(S, cands, scene, history, opts) {
   const pool = clEnumerate(S, cands, scene).filter((p) => !hist.has(p.key));
   if (!pool.length) return [];
   const r = rng((seed >>> 0) || 1);
-  let chosen = clKeepBalance(pool, clSample(pool, K, r));
+  const chosen = clSample(pool, K, r);
   const built = [];
   for (const raw of chosen) {
     const damaged = slip > 0 && r() < slip ? clSlip(raw, S, r) : raw;
@@ -308,6 +299,9 @@ function proposeQuestions(S, cands, scene, history, opts) {
     if (clFlagsOk(flags)) built.push(clAnnotate(damaged, S, scene));
     else built.push(repairProp(damaged, S, cands, scene) || fallbackProp(S, cands, scene));
   }
+  for (const p of built) if (hist.has(p.text)) p.text = "Of the ones left, " + p.text.charAt(0).toLowerCase() + p.text.slice(1);
+  const fresh = built.filter((p) => !hist.has(p.text));
+  built.length = 0; built.push(...fresh);
   built.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const pref = clVlmPreferred(built);
   for (const p of built) p.vlmPick = p === pref;
@@ -458,7 +452,7 @@ function runTrial(scene, instr, targetObjId, policy, opts) {
     if (!sel) break;
     const answer = operatorAnswer(sel, targetObj, eps, noise);
     rounds.push({ S: S.slice(), props, sel, answer });
-    history.push(sel.key);
+    history.push(sel.key, sel.text);
     S = updateState(S, sel, answer);
   }
   const resolved = S.length === 1 ? S[0] : null;

@@ -153,8 +153,8 @@
   .verdict.fail { background: var(--bad-soft); color: var(--bad); }
   .verdict.busy { background: var(--panel-2); color: var(--muted); }
   /* camera views: two compact rows, each button shows its key */
-  .toolbar { top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-  .views { display: grid; grid-template-columns: repeat(6, auto); gap: 1px; padding: 3px; }
+  .toolbar { top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100% - 20px); }
+  .views { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 1px; padding: 3px; max-width: 560px; }
   .views button { display: flex; align-items: baseline; justify-content: space-between; gap: 5px; border: 0; background: none; cursor: pointer; padding: 3px 6px 3px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
   .views button kbd { font: 500 9px var(--mono); color: var(--faint); }
   .views button:hover { color: var(--ink); background: var(--panel-2); }
@@ -397,6 +397,41 @@ table.grid tr.sel td { background: var(--accent-soft); }
 .tag-sim { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
 .camwrap { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
 .camwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.setup { margin: 0 0 4px; }
+.range { display: flex; align-items: center; gap: 8px; }
+.range input[type="range"] { flex: 1; margin: 0; }
+.range output { flex: none; min-width: 34px; text-align: right; font: 500 12px var(--mono); }
+.field input[type="number"] { width: 100%; font: 500 12.5px var(--mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.cand-row { display: flex; flex-wrap: wrap; gap: 4px; min-height: 26px; }
+.cand { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 3px; border-radius: 999px; background: var(--panel-2); font: 500 12px var(--ui); }
+.cand i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); }
+.cand b { font: 600 11px var(--mono); }
+.cand.dead { opacity: 0.42; text-decoration: line-through; }
+.cand.hot { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.prop-wrap { overflow-x: auto; margin: 0 -2px 2px; }
+#ui-props { table-layout: fixed; width: 100%; font: 10.5px var(--mono); }
+#ui-props th, #ui-props td { padding: 2px 2px; }
+#ui-props th:nth-child(2), #ui-props td:nth-child(2),
+#ui-props th:nth-child(3), #ui-props td:nth-child(3) { width: 18px; }
+#ui-props th:nth-child(4), #ui-props td:nth-child(4),
+#ui-props th:nth-child(5), #ui-props td:nth-child(5) { width: 40px; }
+#ui-props th:nth-child(6), #ui-props td:nth-child(6) { width: 46px; }
+#ui-props th:nth-child(7), #ui-props td:nth-child(7) { width: 52px; }
+table.grid td.q { white-space: normal; }
+.flag { display: inline-block; margin-right: 1px; padding: 0 2px; border-radius: 3px; font: 600 8px var(--mono); letter-spacing: 0; }
+.flag.on { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.flag.off { background: var(--bad-soft); color: var(--bad); }
+.star { color: var(--accent); }
+.hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hist li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.hist b { font: 600 11px var(--mono); text-transform: uppercase; color: var(--muted); }
+.outcome { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); font-size: 13px; }
+.outcome.correct { background: color-mix(in srgb, var(--good) 16%, transparent); }
+.outcome.wrong, .outcome.unresolved { background: var(--bad-soft); }
+.stat .value.sm { font-size: 13px; }
+#ui-yes { background: var(--tray-soft); }
+#ui-no { background: var(--reject-soft); }
+#app-speech-lab { margin: 4px 0 0; }
 </style>
 </head>
 <body>
@@ -434,7 +469,33 @@ table.grid tr.sel td { background: var(--accent-soft); }
     </div>
     <div class="card" id="clarify-card">
       <h2>Clarify <span>candidate state · yes/no · EFE</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
-      <div id="clarify"></div>
+      <div id="clarify">
+        <form id="app-form" class="setup" autocomplete="off">
+          <div class="field"><label for="app-set">Set</label><select id="app-set"><option value="offline">offline</option><option value="online">online</option></select></div>
+          <div class="field"><label for="app-scene">Scene</label><select id="app-scene"></select></div>
+          <div class="field"><label for="app-instr">Instruction</label><select id="app-instr"></select></div>
+          <div class="field"><label for="app-policy">Policy</label><select id="app-policy"></select></div>
+          <div class="field"><label for="app-eps">ε</label><span class="range"><input id="app-eps" type="range" min="0" max="0.2" step="0.01" value="0"><output id="app-eps-out" for="app-eps">0.00</output></span></div>
+          <div class="field"><label for="app-k">K</label><span class="range"><input id="app-k" type="range" min="1" max="5" step="1" value="4"><output id="app-k-out" for="app-k">4</output></span></div>
+          <div class="field"><label for="app-seed">Seed</label><input id="app-seed" type="number" min="1" step="1" value="1"></div>
+          <div class="btn-row"><button class="btn" id="app-new" type="button">New trial</button></div>
+          <label class="toggle" id="app-speech-lab"><input id="app-speech" type="checkbox"> Speak the question</label>
+          <p class="small-note" id="app-target-note"></p>
+        </form>
+        <div id="ui-say" class="say" hidden></div>
+        <div class="answer" id="ui-answer" hidden>
+          <button class="btn" id="ui-yes" type="button">Yes <kbd>Y</kbd></button>
+          <button class="btn" id="ui-no" type="button">No <kbd>N</kbd></button>
+        </div>
+        <h3 class="sec-h">State <em>S<sub>t</sub></em></h3>
+        <div id="ui-cands" class="cand-row"></div>
+        <h3 class="sec-h">Proposals <em id="ui-round"></em></h3>
+        <div class="prop-wrap"><table class="grid" id="ui-props"></table></div>
+        <p class="small-note">G = p<sub>yes</sub> ln p<sub>yes</sub> + p<sub>no</sub> ln p<sub>no</sub></p>
+        <h3 class="sec-h">Dialogue</h3>
+        <ol id="ui-hist" class="hist"></ol>
+        <div id="ui-outcome" class="outcome" hidden></div>
+      </div>
     </div>
     <div class="card" id="camera-card">
       <h2>Head camera <span>D435i colour · candidates</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
@@ -447,7 +508,7 @@ table.grid tr.sel td { background: var(--accent-soft); }
     </div>
     <div class="card" id="exp-card">
       <h2>Experiments <span>seeded batch · simulated</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
-      <div id="exp"></div>
+      <div id="exp"><p class="small-note">The batch report is filled when the experiments module is loaded.</p></div>
     </div>
     <div class="card" id="report-card">
       <h2>Paper vs twin <span>Robotics 15(8):154</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
@@ -466,7 +527,7 @@ table.grid tr.sel td { background: var(--accent-soft); }
         <div class="views glass" role="group" aria-label="Camera views" id="views"></div>
       </div>
       <div class="overlay hint glass" id="hint">
-        <span><kbd>Space</kbd> play</span><span><kbd>1</kbd>–<kbd>6</kbd> views</span>
+        <span><kbd>Space</kbd> play</span><span><kbd>1</kbd>–<kbd>7</kbd> views</span><span><kbd>Y</kbd>/<kbd>N</kbd> answer</span>
         <span class="mouse">drag rotate · right-drag pan · wheel zoom</span>
       </div>
       <div class="load-error" id="load-error">The 3D view loads three.js from a CDN and needs an internet connection.<br>Reconnect and reload the page.</div>
@@ -611,7 +672,7 @@ function camProject(p) {
 // Cand    { id:"c2", disp:2, obj:"o3", label:"cup", score:0.61, box:[u0,v0,u1,v1] }      box in CAM pixels
 // Prop    { text, yes:["c1",...], no:[...], key:"handle=true", count:{total,yes,no},
 //           valid:{exhaustive,disjoint,legal,wording}, G, vlmPick:false }
-// Round   { S:[cand ids], props:[Prop], sel, answer:"yes"|"no" }
+// Round   { S:[cand ids], props:[Prop], sel: the selected Prop object, answer:"yes"|"no" }
 // Trial   { scene, instr, target, policy, eps, S0:[cand ids], rounds:[Round], resolved:cand id|null,
 //           outcome:"correct"|"wrong"|"unresolved"|"none", questions }
 // Segment { t0, t1, kind, label, q0, q1 }   one robot motion or dialogue step on the timeline (q = joint dict)
@@ -1628,24 +1689,48 @@ const PAPER = Object.freeze({
 });
 Object.assign(LOGIC, { PAPER });
 // ================================================================ perception (Sec. 3.3) — simulated GroundingDINO
-// One proposal per object. Score bands stand in for the detector; M5 recalibrates PER_SCORE on the 36 offline
-// scenes (paper: mean |S0| 2.49, range 0–8, multi-candidate 46.1 %). No DOM, no three.js, no Math.random.
+// One proposal per object. No DOM, no three.js, no Math.random.
 //
-// TODO-SOURCE: the paper does not publish per-tier score distributions. Bands below are a twin assumption.
-// A bare category prompt ("cup") is treated as easier to ground than a modified phrase ("large orange cup"),
-// so a full noun match outscores a specific match, which outscores noun-only, confusable (fork↔spoon,
-// cup↔bottle), then anything else. missP is the extra chance a bare-noun true match falls below τ.
+// TODO-SOURCE: the paper does not publish per-tier score distributions. Bands below are a twin assumption,
+// refit on the 36 offline scenes (paper: mean |S0| 2.49, multi-candidate 46.1 %, clarifying asked rates by
+// type about 3 / 47 / 92 %). Those three quantities are therefore CALIBRATION TARGETS: the twin matching them is
+// not evidence. Out-of-sample comparisons are accuracy, questions on asked trials, questions vs |S0|, the noise
+// sweep, the K sweep and the online results. Three documented rules sit on top of the bands:
+//
+// 1. Specific phrase ("orange cup"). Every phrase match draws from `specific`, then all but the highest
+//    are redrawn from `rival` (PER_RIVAL). A modified prompt usually keeps one box; each extra phrase
+//    match clears τ with probability (rival.hi − τ) / (rival.hi − rival.lo). Noun, confusable and other
+//    stay under τ, so a clear instruction rarely grows a second candidate and the broad-noun fallback
+//    fires only when the phrase matches nothing at all.
+// 2. Bare noun ("cup"). Category members draw from `full` (a missP fraction from the miss band, under τ).
+//    Confusable categories draw from `broadConf` and unrelated objects from `broadOther`, so an ambiguous
+//    instruction keeps most of the category and a few extras. Those loose bands are not used for a
+//    specific phrase. broadConf and broadOther top out below `full.lo`, so the top-score pick on a bare
+//    noun is almost always a category member (it fails only when every category member takes the missP draw).
+// 3. With probability `singleP` a bare-noun query is collapsed to its single best category box (PER_BARE).
+//    That is what lets ambiguous asked-rate sit near 92 % while the other ambiguous trials stay large
+//    enough for mean |S0| ≈ 2.49. Collapsing keeps the argmax, so a top-score policy is unchanged.
+//
+// A handle/lid constraint on an otherwise bare phrase is scored as specific even though buildQuery leaves
+// it out of the detector string (SPEC §3.1). TODO-SOURCE: the paper does not publish the text prompt per
+// attribute; without this, "the cup with a lid" would detect every cup.
 
 const PER_SCORE = Object.freeze({
-  full: Object.freeze({ lo: 0.58, hi: 0.96 }),          // bare noun, every modifier (there are none) matches
-  specific: Object.freeze({ lo: 0.26, hi: 0.72 }),      // noun + colour/size/material all match
-  noun: Object.freeze({ lo: 0.16, hi: 0.36 }),          // right category, a modifier does not match (always < τ)
-  confusable: Object.freeze({ lo: 0.05, hi: 0.44 }),    // fork↔spoon, cup↔bottle; a tail sits above τ
-  other: Object.freeze({ lo: 0.01, hi: 0.20 }),
-  missP: 0.05,                                          // P(a bare-noun true match is drawn below τ)
-  missLo: 0.04,
+  full: Object.freeze({ lo: 0.60, hi: 0.96 }),          // bare noun, every modifier matches
+  specific: Object.freeze({ lo: 0.64, hi: 0.97 }),      // best modified-phrase match (always ≥ τ)
+  rival: Object.freeze({ lo: 0.14, hi: 0.58 }),         // other phrase matches; P(≥ τ) = 0.455 before NMS
+  noun: Object.freeze({ lo: 0.06, hi: 0.36 }),          // right category, a modifier does not (always < τ)
+  confusable: Object.freeze({ lo: 0.02, hi: 0.30 }),    // specific phrase: fork↔spoon, cup↔bottle, under τ
+  other: Object.freeze({ lo: 0.01, hi: 0.18 }),         // specific phrase: anything else, under τ
+  broadConf: Object.freeze({ lo: 0.40, hi: 0.57 }),     // bare noun: confusable, above τ, below full
+  broadOther: Object.freeze({ lo: 0.33, hi: 0.58 }),    // bare noun: unrelated; P(≥ τ) = 0.80, still below full.lo
+  missP: 0.03,                                          // P(a bare-noun true match is drawn below τ)
+  missLo: 0.05,
   missHi: 0.37,
+  singleP: 0.10,                                        // P(a bare-noun query keeps only its best category box)
 });
+const PER_RIVAL = PER_SCORE.rival;
+const PER_BARE = PER_SCORE.singleP;
 const PER_CONFUSABLE = Object.freeze({ fork: "spoon", spoon: "fork", cup: "bottle", bottle: "cup" });
 
 // Query { noun, mods:{color?,size?,material?}, text, broad }.
@@ -1677,20 +1762,56 @@ function matches(obj, instr) {
 function perTier(obj, query) {
   if (obj.cat === query.noun) {
     const keys = Object.keys(query.mods || {});
-    if (keys.every((k) => obj[k] === query.mods[k])) return keys.length ? "specific" : "full";
-    return "noun";
+    if (!keys.every((k) => obj[k] === query.mods[k])) return "noun";
+    const bools = query.bools || {};
+    const bk = Object.keys(bools);
+    if (bk.some((k) => obj[k] !== bools[k])) return "noun";
+    if (keys.length || bk.length) return "specific";
+    return "full";
   }
   if (PER_CONFUSABLE[obj.cat] === query.noun) return "confusable";
   return "other";
 }
 
+function perBand(tier, broad) {
+  if (tier === "confusable") return broad ? PER_SCORE.broadConf : PER_SCORE.confusable;
+  if (tier === "other") return broad ? PER_SCORE.broadOther : PER_SCORE.other;
+  return PER_SCORE[tier] || PER_SCORE.other;
+}
+
 // Two rng draws per object, always, so a miss coin cannot shift the stream.
-function perDrawScore(r, tier) {
+function perDrawScore(r, tier, broad) {
   const u = r();
   const m = r();
-  const band = PER_SCORE[tier] || PER_SCORE.other;
   if (tier === "full" && m < PER_SCORE.missP) return PER_SCORE.missLo + u * (PER_SCORE.missHi - PER_SCORE.missLo);
+  const band = perBand(tier, broad);
   return band.lo + u * (band.hi - band.lo);
+}
+
+// Keep the highest phrase match. Every other phrase match is redrawn from PER_RIVAL (one extra rng draw).
+function perSuppressRivals(rows, r) {
+  const specs = [];
+  for (const row of rows) if (row.tier === "specific") specs.push(row);
+  if (specs.length < 2) return;
+  specs.sort((a, b) => b.score - a.score || (a.obj < b.obj ? -1 : a.obj > b.obj ? 1 : 0));
+  const lo = PER_RIVAL.lo, span = PER_RIVAL.hi - PER_RIVAL.lo;
+  for (let i = 1; i < specs.length; i++) specs[i].score = lo + r() * span;
+}
+
+// Bare-noun queries only. One rng draw. With probability PER_BARE, every box except the best category
+// match is pushed under τ. The survivor is the same argmax a top-score policy would have picked.
+function perBareTop(rows, r) {
+  if (r() >= PER_BARE) return;
+  const floor = Math.max(PARAMS.tau, PARAMS.textThr);
+  let best = null;
+  for (const row of rows) {
+    if (row.tier !== "full") continue;
+    if (!best || row.score > best.score || (row.score === best.score && row.obj < best.obj)) best = row;
+  }
+  for (const row of rows) {
+    if (row === best) { if (row.score < floor) row.score = PER_SCORE.full.lo; }
+    else if (row.score >= floor) row.score = PER_SCORE.missHi;
+  }
 }
 
 // Axis-aligned body in the object's yaw frame, standing on the table. 8 corners, then the image AABB.
@@ -1751,20 +1872,37 @@ function perLeftToRight(a, b) {
   return (a.box[0] + a.box[2]) - (b.box[0] + b.box[2]) || (a.box[1] - b.box[1]) || (a.obj < b.obj ? -1 : a.obj > b.obj ? 1 : 0);
 }
 
-// Every object, unfiltered. Scores and boxes only; the tier is internal.
+// Phrase used for scoring. buildQuery's public shape is unchanged. A bare phrase that still names a
+// handle or a lid is narrowed so those objects score as a specific match (see the header).
+function perScoreQuery(instr) {
+  const query = buildQuery(instr);
+  if (!query.broad) return query;
+  const src = (instr && instr.mods) || {};
+  const bools = {};
+  for (const k of ["handle", "lid"]) if (typeof src[k] === "boolean") bools[k] = src[k];
+  if (!Object.keys(bools).length) return query;
+  return { noun: query.noun, mods: query.mods, text: query.text, broad: false, bools };
+}
+
+// Every object, unfiltered. Scores and boxes only; the tier is internal and stripped before return.
 function detect(scene, query, seed) {
   const r = rng((seed >>> 0) || 1);
+  const broad = !!query.broad;
   const out = [];
   for (const o of scene.objects) {
-    out.push({ obj: o.id, label: o.cat, score: perDrawScore(r, perTier(o, query)), box: perProjectBox(o) });
+    const tier = perTier(o, query);
+    out.push({ obj: o.id, label: o.cat, score: perDrawScore(r, tier, broad), box: perProjectBox(o), tier });
   }
+  if (broad) perBareTop(out, r);
+  else perSuppressRivals(out, r);
+  for (const row of out) delete row.tier;
   return out;
 }
 
 // τ, same-label NMS at IoU 0.50, at most 100. If the specific phrase returns nothing, run the bare noun
 // (recall first). disp is 1..n from left to right in the image; cand ids follow that order.
 function initialCandidates(scene, instr, seed) {
-  const query = buildQuery(instr);
+  const query = perScoreQuery(instr);
   let kept = perKeep(detect(scene, query, seed >>> 0));
   if (!kept.length && !query.broad) {
     const broad = { noun: query.noun, mods: {}, text: query.noun, broad: true };
@@ -2036,23 +2174,11 @@ function clSample(pool, K, r) {
   return arr.slice(0, n);
 }
 
-// TODO-SOURCE: the paper says the VLM proposes K questions; it does not say they are a uniform subset.
-// A uniform draw of K often misses every balanced split, and ActivAsk then cannot approach the published
-// question counts (2.700 vs ideal 2.667 at |S0| = 6). When the full pool has a maximally balanced
-// partition and the draw missed all of them, swap it into the last slot. ActivAsk still chooses only
-// inside the K it is shown.
-function clKeepBalance(pool, chosen) {
-  if (!pool.length || !chosen.length) return chosen;
-  let best = pool[0];
-  for (const p of pool) {
-    if (clImb(p) < clImb(best) || (clImb(p) === clImb(best) && p.key < best.key)) best = p;
-  }
-  if (chosen.some((p) => clImb(p) === clImb(best))) return chosen;
-  const next = chosen.slice();
-  next[next.length - 1] = best;
-  return next;
-}
-
+// TODO-SOURCE: the paper says the VLM proposes K questions; it does not say how they are distributed. The twin
+// draws K distinct partitions uniformly from the enumerated pool (simulated VLM diversity). ActivAsk chooses only
+// inside the K it is shown, so a larger K raises the chance of a balanced split (paper Sec. 5.3: the mean minimum
+// EFE falls as K grows). An earlier version swapped the most balanced partition into every draw; that made K
+// irrelevant (flat K sweep) and changed ActivAsk's questions on asked trials by only 0.007, so it was removed.
 function clSlip(p, S, r) {
   const kind = Math.floor(r() * 3);
   if (kind === 0 && S.length) {
@@ -2066,7 +2192,10 @@ function clSlip(p, S, r) {
   return { text: "Is it " + (S[0] || "c1") + "?", key: p.key, yes: p.yes.slice(), no: p.no.slice() };
 }
 
-// K proposals drawn with rng. history is a list of keys already asked; those partitions are not offered again.
+// K proposals drawn with rng. history lists the keys AND texts already asked: an asked partition is not offered
+// again, and a new partition whose wording was already used (two split points both read "Is it on the near
+// side?") is reworded relative to the remaining candidates ("Of the ones left, ..."), so the dialogue never
+// repeats a question (Sec. 3.4.1: dialogue history avoids repeating answered questions).
 // slip (default 0 here; runTrial defaults to 0.05) drops a candidate, duplicates one, or leaks an id, then repairs.
 function proposeQuestions(S, cands, scene, history, opts) {
   const opt = opts || {};
@@ -2079,7 +2208,7 @@ function proposeQuestions(S, cands, scene, history, opts) {
   const pool = clEnumerate(S, cands, scene).filter((p) => !hist.has(p.key));
   if (!pool.length) return [];
   const r = rng((seed >>> 0) || 1);
-  let chosen = clKeepBalance(pool, clSample(pool, K, r));
+  const chosen = clSample(pool, K, r);
   const built = [];
   for (const raw of chosen) {
     const damaged = slip > 0 && r() < slip ? clSlip(raw, S, r) : raw;
@@ -2087,6 +2216,9 @@ function proposeQuestions(S, cands, scene, history, opts) {
     if (clFlagsOk(flags)) built.push(clAnnotate(damaged, S, scene));
     else built.push(repairProp(damaged, S, cands, scene) || fallbackProp(S, cands, scene));
   }
+  for (const p of built) if (hist.has(p.text)) p.text = "Of the ones left, " + p.text.charAt(0).toLowerCase() + p.text.slice(1);
+  const fresh = built.filter((p) => !hist.has(p.text));
+  built.length = 0; built.push(...fresh);
   built.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const pref = clVlmPreferred(built);
   for (const p of built) p.vlmPick = p === pref;
@@ -2237,7 +2369,7 @@ function runTrial(scene, instr, targetObjId, policy, opts) {
     if (!sel) break;
     const answer = operatorAnswer(sel, targetObj, eps, noise);
     rounds.push({ S: S.slice(), props, sel, answer });
-    history.push(sel.key);
+    history.push(sel.key, sel.text);
     S = updateState(S, sel, answer);
   }
   const resolved = S.length === 1 ? S[0] : null;
@@ -2248,6 +2380,291 @@ function runTrial(scene, instr, targetObjId, policy, opts) {
 Object.assign(LOGIC, {
   proposeQuestions, validateProp, repairProp, fallbackProp, efe, updateState, selectProp, operatorAnswer, runTrial,
 });
+// ================================================================ experiments (Sec. 4) — twin (simulated)
+// Offline: 36 scenes, 216 trials per policy, types cycling clear → partial → ambiguous, scenes round-robin.
+// Online: 20 scenes, 57 trials per policy (19 per type), the four online policies, then a simulated grasp.
+// A wrong, unresolved or empty target is not executed (operator verification). An executed grasp succeeds
+// with PAPER.graspByCat, drawn with rng. Every number this module produces is twin (simulated).
+// No DOM, no three.js, no Math.random.
+
+function exMix(seed, salt) {
+  let x = (Math.imul((seed >>> 0) || 1, 0x9E3779B1) + Math.imul(salt >>> 0, 0x85EBCA6B)) >>> 0;
+  x ^= x >>> 16;
+  return x || 1;
+}
+
+function exRound(x) {
+  return Math.round(x * 100) / 100;
+}
+
+// Wilson score interval, in percent. wilson(199, 216) is the paper's [87.76, 95.03].
+function wilson(k, n, z = 1.96) {
+  if (!n) return [0, 0];
+  const p = k / n;
+  const z2 = z * z;
+  const den = 1 + z2 / n;
+  const centre = (p + z2 / (2 * n)) / den;
+  const margin = (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / den;
+  const lo = Math.max(0, centre - margin) * 100;
+  const hi = Math.min(1, centre + margin) * 100;
+  return [exRound(lo), exRound(hi)];
+}
+
+function exPolicyIds(list) {
+  const src = list && list.length ? list : POLICIES;
+  return src.map((p) => (typeof p === "string" ? p : p.id));
+}
+
+function exScenes(set) {
+  const out = [];
+  for (const s of SCENES) if (s.set === set) out.push(s);
+  return out;
+}
+
+// Trial i: type cycles clear → partial → ambiguous, scene is round-robin inside that cycle.
+function exRow(scenes, seed, i) {
+  const t = i % INSTR_TYPES.length;
+  const k = Math.floor(i / INSTR_TYPES.length);
+  const type = INSTR_TYPES[t];
+  const scene = scenes[(k + t) % scenes.length];
+  const r = rng(exMix(seed, i + 1));
+  const pool = INSTRUCTIONS[scene.id].filter((ins) => ins.type === type);
+  const instr = pool[Math.floor(r() * pool.length)];
+  const target = instr.matches[Math.floor(r() * instr.matches.length)];
+  return {
+    scene, instr, target, type,
+    layoutSeed: exMix(seed, 0x5100 + i),
+    trialSeed: exMix(seed, 0x7A1100 + i),
+  };
+}
+
+const exPlaced = new Map();
+function exPlace(scene, seed) {
+  const key = scene.id + ":" + (seed >>> 0);
+  let placed = exPlaced.get(key);
+  if (!placed) {
+    placed = layoutScene(scene, seed >>> 0 || 1);
+    exPlaced.set(key, placed);
+  }
+  return placed;
+}
+
+function exPlan(set, count, seed) {
+  const scenes = exScenes(set);
+  const rows = [];
+  for (let i = 0; i < count; i++) rows.push(exRow(scenes, seed, i));
+  return rows;
+}
+
+function exGrasp(trial, placed, targetId, trialSeed) {
+  const executed = trial.outcome === "correct";
+  let grasped = false;
+  if (executed) {
+    const obj = placed.objects.find((o) => o.id === targetId);
+    const cat = obj ? PAPER.graspByCat[obj.cat] : null;
+    const rate = cat ? cat.rate / 100 : 0;
+    const g = rng(exMix(trialSeed, 0x6A09E667));
+    grasped = g() < rate;
+  }
+  trial.executed = executed;
+  trial.grasped = grasped;
+  trial.grasp = executed ? (grasped ? "ok" : "fail") : "skipped";
+  trial.simulated = true;
+  return trial;
+}
+
+function exBlank(n) {
+  return { n, correct: 0, askedN: 0, qSum: 0, qAskedSum: 0 };
+}
+
+function exFinish(row) {
+  const acc = row.n ? (100 * row.correct) / row.n : 0;
+  const asked = row.n ? (100 * row.askedN) / row.n : 0;
+  const qAll = row.n ? row.qSum / row.n : 0;
+  const qAsked = row.askedN ? row.qAskedSum / row.askedN : null;
+  return {
+    n: row.n, correct: row.correct, acc, ci: wilson(row.correct, row.n),
+    asked, qAll, qAsked,
+  };
+}
+
+// Per policy: n, correct, acc + Wilson CI, asked %, mean Q (all and asked), outcome counts,
+// by instruction type, by family, mean questions by |S0| = 2..6.
+// Online rows also carry attempts, grasp %, full-task %, non-executed.
+function summarize(trials) {
+  const groups = new Map();
+  for (const t of trials || []) {
+    if (!groups.has(t.policy)) groups.set(t.policy, []);
+    groups.get(t.policy).push(t);
+  }
+  const summary = {};
+  for (const [policy, list] of groups) {
+    const base = exBlank(list.length);
+    const outcomes = { correct: 0, wrong: 0, unresolved: 0, none: 0 };
+    const byType = {};
+    const byFamily = {};
+    const qByS0 = {};
+    for (let s = 2; s <= 6; s++) qByS0[s] = { n: 0, qSum: 0 };
+    let s0 = 0, multi = 0, attempts = 0, grasped = 0, online = false;
+    for (const t of list) {
+      const n0 = t.S0 ? t.S0.length : 0;
+      s0 += n0;
+      if (n0 > 1) multi++;
+      if (outcomes[t.outcome] != null) outcomes[t.outcome]++;
+      base.correct += t.outcome === "correct" ? 1 : 0;
+      base.qSum += t.questions || 0;
+      if ((t.questions || 0) > 0) { base.askedN++; base.qAskedSum += t.questions; }
+      const type = t.type || "clear";
+      const fam = t.family || "mixed";
+      if (!byType[type]) byType[type] = exBlank(0);
+      if (!byFamily[fam]) byFamily[fam] = exBlank(0);
+      for (const bucket of [byType[type], byFamily[fam]]) {
+        bucket.n++;
+        bucket.correct += t.outcome === "correct" ? 1 : 0;
+        bucket.qSum += t.questions || 0;
+        if ((t.questions || 0) > 0) { bucket.askedN++; bucket.qAskedSum += t.questions; }
+      }
+      if (n0 >= 2 && n0 <= 6) { qByS0[n0].n++; qByS0[n0].qSum += t.questions || 0; }
+      if (t.executed != null) {
+        online = true;
+        if (t.executed) attempts++;
+        if (t.grasped) grasped++;
+      }
+    }
+    const done = exFinish(base);
+    const typeOut = {};
+    for (const key of Object.keys(byType)) typeOut[key] = exFinish(byType[key]);
+    const famOut = {};
+    for (const key of Object.keys(byFamily)) famOut[key] = exFinish(byFamily[key]);
+    const qOut = {};
+    for (let s = 2; s <= 6; s++) qOut[s] = { n: qByS0[s].n, q: qByS0[s].n ? qByS0[s].qSum / qByS0[s].n : null };
+    summary[policy] = {
+      ...done, outcomes, byType: typeOut, byFamily: famOut, qByS0: qOut,
+      meanS0: list.length ? s0 / list.length : 0,
+      multi: list.length ? (100 * multi) / list.length : 0,
+      simulated: true,
+    };
+    if (online) {
+      summary[policy].attempts = attempts;
+      summary[policy].nonExec = list.length - attempts;
+      summary[policy].grasp = attempts ? (100 * grasped) / attempts : 0;
+      summary[policy].graspCi = wilson(grasped, attempts);
+      summary[policy].full = list.length ? (100 * grasped) / list.length : 0;
+      summary[policy].fullCi = wilson(grasped, list.length);
+    }
+  }
+  return summary;
+}
+
+// One schedule shared by every policy, so the methods are paired on scene, instruction, target and S0.
+function runBatch(opts) {
+  const opt = opts || {};
+  const set = opt.set === "online" ? "online" : "offline";
+  const seed = opt.seed == null ? 1 : opt.seed;
+  const eps = opt.eps == null ? 0 : opt.eps;
+  const K = opt.K == null ? PARAMS.K : opt.K;
+  const slip = opt.slip == null ? 0.05 : opt.slip;
+  const count = opt.perPolicy == null ? (set === "online" ? 57 : 216) : opt.perPolicy;
+  const policies = exPolicyIds(opt.policies || (set === "online" ? POLICIES.filter((p) => p.online) : POLICIES));
+  const plan = exPlan(set, count, seed >>> 0 || 1);
+  const trials = [];
+  for (const policy of policies) {
+    for (let i = 0; i < plan.length; i++) {
+      const row = plan[i];
+      const placed = exPlace(row.scene, row.layoutSeed);
+      const trial = runTrial(placed, row.instr, row.target, policy, {
+        seed: row.trialSeed, eps, K, slip,
+      });
+      trial.type = row.type;
+      trial.family = row.scene.family;
+      if (set === "online") exGrasp(trial, placed, row.target, row.trialSeed);
+      trials.push(trial);
+    }
+  }
+  return { trials, summary: summarize(trials), seed, set, simulated: true };
+}
+
+// Clarifying policies, conditioned on |S0| ≥ 2 and the intended target inside S0. N per policy.
+function epsSweep(opts) {
+  const opt = opts || {};
+  const epsList = opt.eps || [0, 0.05, 0.1, 0.15, 0.2];
+  const n = opt.n == null ? 98 : opt.n;
+  const seed = opt.seed == null ? 1 : opt.seed;
+  const set = opt.set || "offline";
+  const slip = opt.slip == null ? 0.05 : opt.slip;
+  const K = opt.K == null ? PARAMS.K : opt.K;
+  const policies = exPolicyIds(opt.policies || ["firstQ", "randomQ", "vlmQ", "activask"]);
+  const scenes = exScenes(set);
+  const planSeed = exMix(seed, 0xE550);
+  const specs = [];
+  let i = 0;
+  while (specs.length < n && i < Math.max(n * 40, 400)) {
+    const row = exRow(scenes, planSeed, i);
+    i++;
+    const placed = exPlace(row.scene, row.layoutSeed);
+    const cs = initialCandidates(placed, row.instr, row.trialSeed >>> 0);
+    if (cs.length >= 2 && cs.some((c) => c.obj === row.target)) specs.push({ row, placed });
+  }
+  const byPolicy = {};
+  for (const policy of policies) {
+    byPolicy[policy] = epsList.map((eps) => {
+      let correct = 0;
+      for (const spec of specs) {
+        const trial = runTrial(spec.placed, spec.row.instr, spec.row.target, policy, {
+          seed: spec.row.trialSeed, eps, K, slip,
+        });
+        if (trial.outcome === "correct") correct++;
+      }
+      return { eps, n: specs.length, correct, acc: specs.length ? (100 * correct) / specs.length : 0, simulated: true };
+    });
+  }
+  return { eps: epsList.slice(), n: specs.length, byPolicy, simulated: true };
+}
+
+function exMinG(round) {
+  let g = 0, any = false;
+  for (const p of round.props || []) {
+    if (typeof p.G !== "number") continue;
+    if (!any || p.G < g) { g = p.G; any = true; }
+  }
+  return any ? g : null;
+}
+
+// Mean minimum proposal G per round, for ambiguous and partial instructions, at each K.
+function kSweep(opts) {
+  const opt = opts || {};
+  const Ks = opt.K || [1, 2, 3, 4, 5];
+  const seed = opt.seed == null ? 1 : opt.seed;
+  const slip = opt.slip == null ? 0.05 : opt.slip;
+  const perType = opt.perType == null ? 72 : opt.perType;
+  const plan = exPlan("offline", perType * 3, seed >>> 0 || 1).filter((row) => row.type !== "clear");
+  const ambiguous = [];
+  const partial = [];
+  const rounds = { ambiguous: [], partial: [] };
+  for (const K of Ks) {
+    const sum = { ambiguous: 0, partial: 0 };
+    const cnt = { ambiguous: 0, partial: 0 };
+    for (const row of plan) {
+      const placed = exPlace(row.scene, row.layoutSeed);
+      const trial = runTrial(placed, row.instr, row.target, "activask", {
+        seed: row.trialSeed, eps: 0, K, slip,
+      });
+      for (const round of trial.rounds) {
+        const g = exMinG(round);
+        if (g == null) continue;
+        sum[row.type] += g;
+        cnt[row.type]++;
+      }
+    }
+    ambiguous.push(cnt.ambiguous ? sum.ambiguous / cnt.ambiguous : null);
+    partial.push(cnt.partial ? sum.partial / cnt.partial : null);
+    rounds.ambiguous.push(cnt.ambiguous);
+    rounds.partial.push(cnt.partial);
+  }
+  return { K: Ks.slice(), ambiguous, partial, rounds, simulated: true };
+}
+
+Object.assign(LOGIC, { runBatch, wilson, summarize, epsSweep, kSweep });
 // ================================================================ Stretch 3 specifications (M1)
 // Pure logic: no DOM, no three.js. The build keeps this file inside the logic block.
 // Ranges are metres or radians. Each line cites the page the number comes from.
@@ -3551,17 +3968,23 @@ function applyTheme() {
 // ---------------------------------------------------------------- camera views. Written in the cell frame (x, y, z up) and
 // converted to three.js scene space: cell (x, y, z) -> scene (x, z, -y).
 const cv = (x, y, z) => V(x, z, -y);
+// Aimed at the real cell: robot base on the -y side, table centred at the origin, head at CAM_POSE.
+// Table sits off the mast axis so the mast is not between the lens and the objects.
+// Head is the head camera: CAM vertical fov, near enough to clip the D435i housing.
 const VIEW_DEFS = {
-  room:   { label: "Room",   pos: [3.2, -3.6, 2.2],   target: [0.0, 0.0, 0.70] },
-  iso:    { label: "Iso",    pos: [1.55, -1.95, 1.65], target: [0.0, -0.20, 0.80] },
-  robot:  { label: "Robot",  pos: [-1.30, -1.10, 1.30], target: [0.0, -0.55, 0.85] },
-  table:  { label: "Table",  pos: [0.0, -0.95, 1.45],  target: [0.0, -0.05, 0.74] },
-  top:    { label: "Top",    pos: [0.0, -0.30, 3.2],   target: [0.0, -0.30, 0.74] },
-  user:   { label: "User",   pos: [0.0, 1.60, 1.55],   target: [0.0, -0.30, 0.85] },
+  room:  { label: "Room",  pos: [2.35, -2.45, 1.90], target: [0.05, -0.05, 0.72] },
+  iso:   { label: "Iso",   pos: [1.72, -2.15, 1.62], target: [0.02, -0.28, 0.58] },
+  robot: { label: "Robot", pos: [-2.25, -0.20, 1.05], target: [0.20, -0.50, 0.70] },
+  table: { label: "Table", pos: [0.62, 1.02, 1.22], target: [-0.02, -0.04, 0.76] },
+  top:   { label: "Top",   pos: [0.02, -0.42, 2.25], target: [0.00, -0.02, 0.74] },
+  user:  { label: "User",  pos: [0.00, 1.48, 1.42], target: [0.00, -0.42, 0.86] },
+  head:  { label: "Head",  pos: [CAM_POSE.pos[0], CAM_POSE.pos[1], CAM_POSE.pos[2]], target: [CAM_POSE.look[0], CAM_POSE.look[1], CAM_POSE.look[2]], fov: CAM.vfov, near: 0.05 },
 };
-const views = Object.fromEntries(Object.entries(VIEW_DEFS).map(([k, v]) => [k, { label: v.label, pos: cv(...v.pos), target: cv(...v.target) }]));
+const views = Object.fromEntries(Object.entries(VIEW_DEFS).map(([k, v]) => [k, {
+  label: v.label, pos: cv(...v.pos), target: cv(...v.target), fov: v.fov || 0, near: v.near || 0,
+}]));
 window.pcViews = views;
-const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6"];   // keys follow the toolbar order
+const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6", "7"];   // keys follow the toolbar order
 {
   const host = $("views");
   Object.entries(views).forEach(([k, v], i) => {
@@ -3575,7 +3998,10 @@ const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6"];   // keys follow the toolba
 let flight = null;
 function setView(name) {
   const v = views[name]; if (!v) return;
-  if (camera.fov !== 34) { camera.fov = 34; camera.updateProjectionMatrix(); }   // a film fov never sticks to the views
+  const fov = v.fov || 34, near = v.near || 0.01;
+  if (camera.fov !== fov || camera.near !== near) {
+    camera.fov = fov; camera.near = near; camera.updateProjectionMatrix();
+  }
   flight = { t: 0, fromP: camera.position.clone(), fromT: controls.target.clone(), toP: v.pos.clone(), toT: v.target.clone() };
   document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
 }
@@ -3587,9 +4013,8 @@ function resize() {
   renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(viewport);
-// ================================================================ UI shell (lead-owned): panels, mode, Now overlay, paper table
-// Workers do not edit this file. Panel bodies (#clarify, #grasp, #exp, #report twin column, #camera-res) are filled
-// by the integration step (M7) through the APIs of the logic modules.
+// ================================================================ UI shell: panels, mode, Now overlay, paper table, trial readouts
+// Panel bodies are filled from the trial state in 65-app.js (appShown, appCands, appTrial).
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const fmt = (v, d = 2) => (v == null || Number.isNaN(v) ? "–" : Number(v).toFixed(d));
 const uiNarrow = matchMedia("(max-width: 720px)");
@@ -3654,8 +4079,1871 @@ function renderPaperTable() {
     <p class="small-note">Paper: ${PAPER.ref} Twin numbers are simulated (rule-based questions, simulated perception) and are never the paper's results.</p>`;
 }
 renderPaperTable();
-$("live-stats").innerHTML = `<div class="stat"><small>Parameters</small><div class="value">τ ${PARAMS.tau}</div><div class="sub">K = ${PARAMS.K} proposals · NMS ${PARAMS.nmsIoU}</div></div>`;
-function uiThemeChanged() {}
+
+const uiKindShort = { perceive: "see", resolved: "ok", unresolved: "stop", pregrasp: "pre", reobserve: "look" };
+const uiKindHex = {
+  listen: "#a8620c", perceive: "#7a4fc0", ask: "#0b8484", answer: "#2a8a3e",
+  resolved: "#2a8a3e", unresolved: "#c8312b", grasp: "#3550c8", pregrasp: "#3550c8",
+  descend: "#8a6d1f", close: "#c4531a", lift: "#0b8484", retract: "#5f6670", reobserve: "#7a4fc0",
+};
+function uiEsc(s) {
+  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+}
+function uiHex(color) {
+  const n = OBJ_COLORS[color];
+  return n == null ? "#cccccc" : "#" + n.toString(16).padStart(6, "0");
+}
+function uiCell(v) {
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, "\"\"")}"` : s;
+}
+function uiCsv() {
+  const head = ["scene", "instruction", "type", "policy", "eps", "K", "S0", "questions", "outcome", "resolved", "target"];
+  const lines = [head.join(",")];
+  for (const row of appLog) {
+    lines.push([row.scene, row.instruction, row.type, row.policy, row.eps, row.K, row.S0, row.questions, row.outcome, row.resolved, row.target].map(uiCell).join(","));
+  }
+  return lines.join("\n");
+}
+function uiPaint() {
+  const shown = appShown || {};
+  const S = new Set(shown.S || []);
+  const cands = $("ui-cands");
+  if (cands) {
+    let html = "";
+    for (const c of appCands) {
+      const o = appObj(c.obj);
+      const dead = !S.has(c.id);
+      const hot = shown.resolved === c.id;
+      html += `<span class="cand${dead ? " dead" : ""}${hot ? " hot" : ""}"><i style="background:${uiHex(o && o.color)}"></i><b>${c.disp}</b> ${uiEsc(c.label)}</span>`;
+    }
+    cands.innerHTML = html || `<span class="small-note">No candidate passed τ.</span>`;
+  }
+  const round = $("ui-round");
+  if (round) round.textContent = shown.roundLabel || "";
+  const table = $("ui-props");
+  if (table) {
+    const props = shown.props || [];
+    const sel = shown.sel;
+    let rows = "";
+    for (const p of props) {
+      const n = p.count && p.count.total ? p.count.total : 0;
+      const py = n ? p.count.yes / n : 0;
+      const pn = n ? p.count.no / n : 0;
+      const on = !!(sel && (p === sel || p.key === sel.key));
+      const flags = p.valid || {};
+      const flag = (ok, name, title) => `<span class="flag ${ok ? "on" : "off"}" title="${title}">${name}</span>`;
+      rows += `<tr class="${on ? "sel" : ""}"><td class="q">${on ? `<span class="star">★</span> ` : ""}${uiEsc(p.text)}</td>`
+        + `<td>${p.count ? p.count.yes : "–"}</td><td>${p.count ? p.count.no : "–"}</td>`
+        + `<td>${n ? py.toFixed(3) : "–"}</td><td>${n ? pn.toFixed(3) : "–"}</td><td>${fmt(p.G, 3)}</td>`
+        + `<td class="flags">${flag(flags.exhaustive, "E", "exhaustive")}${flag(flags.disjoint, "D", "disjoint")}${flag(flags.legal, "L", "legal")}${flag(flags.wording, "W", "wording")}</td></tr>`;
+    }
+    table.innerHTML = `<thead><tr><th>Question</th><th title="yes branch">Y</th><th title="no branch">N</th><th title="p yes">p<sub>y</sub></th><th title="p no">p<sub>n</sub></th><th>G</th><th title="exhaustive, disjoint, legal, wording">Valid</th></tr></thead><tbody>${rows || `<tr><td class="q">No proposal this round.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`}</tbody>`;
+  }
+  const hist = $("ui-hist");
+  if (hist) {
+    const items = shown.history || [];
+    hist.innerHTML = items.length
+      ? items.map((h, i) => `<li><span>${i + 1}. ${uiEsc(h.text)}</span><b>${uiEsc(h.answer)}</b></li>`).join("")
+      : `<li><span>No question yet.</span><b></b></li>`;
+  }
+  const say = $("ui-say");
+  if (say) {
+    const asking = (shown.phase === "ask" || shown.phase === "answer") && shown.sel;
+    say.hidden = false;
+    if (asking) say.innerHTML = `<small>robot asks</small>${uiEsc(shown.sel.text)}`;
+    else if (appInstr) say.innerHTML = `<small>${uiEsc(appInstr.type)} · ${uiEsc(appPolicy)}</small>${uiEsc(appInstr.text)}`;
+    else say.hidden = true;
+  }
+  const answers = $("ui-answer");
+  if (answers) answers.hidden = !(mode === "interactive" && shown.pending);
+  const out = $("ui-outcome");
+  if (out) {
+    if (shown.outcome) {
+      out.hidden = false;
+      out.className = "outcome " + shown.outcome;
+      out.textContent = shown.belief ? `${shown.outcome} · ${shown.belief}` : shown.outcome;
+    } else {
+      out.hidden = true;
+      out.textContent = "";
+    }
+  }
+  const note = $("app-target-note");
+  if (note) {
+    note.textContent = mode === "interactive"
+      ? (appTargetChosen ? "Hidden target set." : "Click an object to set the hidden target.")
+      : "Hidden target: drawn from the instruction's matches.";
+  }
+  uiPaintLive();
+  uiPaintCam();
+  uiPaintGrasp();
+}
+function uiPaintLive() {
+  const host = $("live-stats");
+  if (!host) return;
+  const ins = appInstr;
+  const pol = POLICIES.find((p) => p.id === appPolicy);
+  const outcome = (appShown && appShown.outcome) || "in progress";
+  const questions = appShown ? appShown.questions : 0;
+  host.innerHTML = `<div class="stat"><small>Scene</small><div class="value sm">${uiEsc(appSceneId || "–")}</div><div class="sub">${uiEsc(appPlaced ? appPlaced.family : "")} · ${uiEsc(appSet || "")}</div></div>`
+    + `<div class="stat"><small>Instruction</small><div class="value sm">${uiEsc(ins ? ins.type : "–")}</div><div class="sub">|S0| = ${appCands.length}</div></div>`
+    + `<div class="stat"><small>Questions</small><div class="value">${questions}</div><div class="sub">${uiEsc(outcome)}</div></div>`
+    + `<div class="stat"><small>Policy</small><div class="value sm">${uiEsc(pol ? pol.label : appPolicy || "–")}</div><div class="sub">${uiEsc(pol ? pol.rule : "")}</div></div>`
+    + `<div class="stat"><small>τ</small><div class="value">${PARAMS.tau}</div><div class="sub">text ${PARAMS.textThr} · NMS ${PARAMS.nmsIoU}</div></div>`
+    + `<div class="stat"><small>K</small><div class="value">${appK}</div><div class="sub">ε ${Number(appEps).toFixed(2)} · seed ${appSeed}</div></div>`;
+  const sub = $("live-sub");
+  if (sub) sub.textContent = appShown && appShown.phase ? appShown.phase : "";
+}
+function uiPaintCam() {
+  const host = $("camera-res");
+  if (!host) return;
+  const alive = appShown && appShown.S ? appShown.S.length : 0;
+  host.innerHTML = `<div><small>Candidates</small><b>${appCands.length}</b></div>`
+    + `<div><small>Still in S</small><b class="${alive ? "ok" : "warn"}">${alive}</b></div>`
+    + `<div><small>τ</small><b>${PARAMS.tau}</b></div>`
+    + `<div><small>Head</small><b>${CAM.w}×${CAM.h}</b></div>`;
+}
+function uiPaintGrasp() {
+  const host = $("grasp");
+  if (!host) return;
+  if (!appWillGrasp) {
+    host.innerHTML = `<p class="outcome unresolved">not executed</p><p class="small-note">Wrong or unresolved targets are not executed. The operator verifies the target first (Sec. 4.3).</p>`;
+    return;
+  }
+  const belief = appShown && appShown.belief ? appShown.belief : "Resolved target.";
+  if (!appPlan || !appPlan.plan) {
+    host.innerHTML = `<p class="outcome">${uiEsc(belief)}</p><p class="small-note">Placeholder grasp. planGrasp and stretchIK are not in this build, so the timeline holds one grasp segment and the arm stays put.</p>`;
+    return;
+  }
+  const plan = appPlan.plan;
+  const q = appPlan.q;
+  const keys = ["x", "lift", "arm", "yaw", "pitch", "roll", "grip", "pan", "tilt"];
+  let joints = "";
+  if (q) for (const k of keys) if (typeof q[k] === "number") joints += `<dt>${k}</dt><dd>${q[k].toFixed(3)}</dd>`;
+  host.innerHTML = `<p class="small-note">${uiEsc(belief)}</p>`
+    + `<dl class="kv"><dt>Mode</dt><dd>${uiEsc(plan.mode || "–")}</dd>`
+    + `<dt>Width</dt><dd>${typeof plan.width === "number" ? plan.width.toFixed(3) + " m" : "–"}</dd>`
+    + `<dt>Yaw</dt><dd>${typeof plan.yaw === "number" ? plan.yaw.toFixed(3) + " rad" : "–"}</dd></dl>`
+    + (joints ? `<h3 class="sec-h">Joints</h3><dl class="kv">${joints}</dl>` : `<p class="small-note">${q ? "" : "stretchIK: unreachable."}</p>`)
+    + `<p class="small-note">${appHasWaypoints ? "Waypoint motion." : "Placeholder segment. graspWaypoints is not in this build."} <span class="tag-sim">twin (simulated)</span></p>`;
+}
+function uiDrawLanes() {
+  const c = $("lanes");
+  if (!c) return;
+  const g = c.getContext("2d");
+  const w = c.width, h = c.height;
+  g.clearRect(0, 0, w, h);
+  const segs = appSegs;
+  const dur = Math.max(0.1, DURATION);
+  const dpr = w / Math.max(1, c.clientWidth || w);
+  const y = 5 * dpr, bh = Math.max(4, h - 10 * dpr);
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
+    const x = (s.t0 / dur) * w;
+    const bw = Math.max(dpr, ((s.t1 - s.t0) / dur) * w - dpr);
+    g.fillStyle = uiKindHex[s.kind] || "#8a8078";
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, bw, bh, 3 * dpr);
+    else g.rect(x, y, bw, bh);
+    g.fill();
+    g.font = `600 ${Math.round(11 * dpr)}px "IBM Plex Sans", sans-serif`;
+    const brief = uiKindShort[s.kind];
+    const pad = 8 * dpr;
+    const text = g.measureText(s.kind).width + pad <= bw ? s.kind
+      : (brief && g.measureText(brief).width + pad <= bw ? brief : "");
+    if (text) {
+      g.save();
+      g.beginPath();
+      g.rect(x, y, bw, bh);
+      g.clip();
+      g.fillStyle = "#fff";
+      g.textBaseline = "middle";
+      g.fillText(text, x + 4 * dpr, y + bh * 0.52);
+      g.restore();
+    }
+  }
+}
+function uiFitLanes() {
+  const c = $("lanes");
+  if (!c) return;
+  const r = c.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = Math.max(2, Math.round(r.width * dpr));
+  const h = Math.max(2, Math.round(r.height * dpr));
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  uiDrawLanes();
+}
+function uiSegAtClient(clientX) {
+  const tl = $("timeline");
+  const r = tl.getBoundingClientRect();
+  const t = ((clientX - r.left) / Math.max(1, r.width)) * DURATION;
+  return appSegAt(t);
+}
+const uiTip = el("div", "tl-tip glass");
+uiTip.hidden = true;
+$("timeline").appendChild(uiTip);
+let uiTipSeg = null;
+function uiHover(e) {
+  const seg = uiSegAtClient(e.clientX);
+  const tl = $("timeline");
+  const r = tl.getBoundingClientRect();
+  if (!seg) { uiTip.hidden = true; uiTipSeg = null; return; }
+  if (seg !== uiTipSeg) {
+    uiTipSeg = seg;
+    uiTip.innerHTML = `<div class="t"><span>${uiEsc(seg.kind)}</span><em>${seg.t0.toFixed(1)}–${seg.t1.toFixed(1)} s</em></div>`
+      + `<div class="r"><span class="chip">${uiEsc(seg.kind)}</span><span>${uiEsc(seg.label || "")}</span></div>`;
+  }
+  uiTip.hidden = false;
+  const left = e.clientX - r.left;
+  uiTip.style.left = `${Math.max(4, Math.min(left, r.width - 200))}px`;
+}
+$("timeline").addEventListener("pointermove", uiHover);
+$("timeline").addEventListener("pointerleave", () => { uiTip.hidden = true; uiTipSeg = null; });
+new ResizeObserver(uiFitLanes).observe($("timeline"));
+function uiCopyState(text) {
+  const b = $("copy-csv");
+  if (!b) return;
+  b.textContent = text;
+  setTimeout(() => { b.textContent = "Copy trials CSV"; }, 1400);
+}
+function uiCopyCsv() {
+  const text = uiCsv();
+  const done = () => uiCopyState("Copied");
+  const fail = () => uiCopyState("Copy failed");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { fail(); }
+      ta.remove();
+    });
+  } else fail();
+}
+function uiBindChrome() {
+  const copy = $("copy-csv");
+  if (copy) copy.addEventListener("click", uiCopyCsv);
+  const yes = $("ui-yes"), no = $("ui-no");
+  if (yes) yes.addEventListener("click", () => appAnswer("yes"));
+  if (no) no.addEventListener("click", () => appAnswer("no"));
+}
+function uiThemeChanged() { uiDrawLanes(); }
+queueMicrotask(() => { uiBindChrome(); uiFitLanes(); });
+// ================================================================ trial controller (prefix app)
+// Auto runs runTrial and plays the dialogue. Interactive asks one proposal and waits for Yes/No.
+// Grasp runs only after a correct resolution (operator verification, Sec. 4.3).
+// A placeholder grasp segment is 2.4 s until graspWaypoints exists (M4). That duration is a twin assumption.
+
+const appHomeQ = Object.freeze({
+  x: stretchQ.x, lift: stretchQ.lift, arm: stretchQ.arm, yaw: stretchQ.yaw,
+  pitch: stretchQ.pitch, roll: stretchQ.roll, grip: stretchQ.grip, pan: stretchQ.pan, tilt: stretchQ.tilt,
+});
+
+let appReady = false;
+let appFilling = false;
+let appSet = "offline";
+let appSceneId = "off-cups-01";
+let appInstrIndex = 0;
+let appPolicy = "activask";
+let appEps = 0;
+let appK = 4;
+let appSeed = 1;
+let appSpeech = false;
+let appSpoken = "";
+let appSerial = 1;
+let appPlaced = null;
+let appInstr = null;
+let appCands = [];
+let appTarget = null;
+let appTargetChosen = false;
+let appTrial = null;
+let appSegs = [];
+let appGroups = new Map();
+let appLog = [];
+let appLogRow = null;
+let appWillGrasp = false;
+let appHasWaypoints = false;
+let appPlan = null;
+let appGraspTick = null;
+let appLastSeg = null;
+let appS = [];
+let appRounds = [];
+let appHist = [];
+let appProps = [];
+let appPending = null;
+let appIxDone = false;
+let appIxLogged = false;
+let appShown = {
+  S: [], props: [], sel: null, history: [], outcome: null, resolved: null,
+  questions: 0, pending: false, belief: "", phase: "", roundLabel: "",
+};
+const appAlive = new Uint8Array(24);
+let appHot = 0;
+const appRay = new THREE.Raycaster();
+const appPtr = new THREE.Vector2();
+let appDownX = 0;
+let appDownY = 0;
+
+function appUse3d() { return !QS.has("gallery"); }
+
+function appFreshSeed() {
+  appSerial = (appSerial + 1) >>> 0;
+  return (((Date.now() >>> 0) ^ Math.imul(appSerial, 0x9e3779b1)) >>> 0) || 1;
+}
+
+function appDrawTarget(instr, seed) {
+  const ids = (instr && instr.matches) || [];
+  if (!ids.length) return null;
+  const r = rng((seed >>> 0) || 1);
+  return ids[Math.floor(r() * ids.length)];
+}
+
+function appCand(id) {
+  for (let i = 0; i < appCands.length; i++) if (appCands[i].id === id) return appCands[i];
+  return null;
+}
+
+function appObj(id) {
+  const list = appPlaced && appPlaced.objects;
+  if (!list) return null;
+  for (let i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+  return null;
+}
+
+function appResolvedObj() {
+  if (!appTrial || !appTrial.resolved) return null;
+  const c = appCand(appTrial.resolved);
+  return c ? appObj(c.obj) : null;
+}
+
+function appBelief() {
+  if (!appTrial || !appTrial.resolved) return "";
+  const c = appCand(appTrial.resolved);
+  const o = c ? appObj(c.obj) : null;
+  if (!o) return "I think you mean that one.";
+  return "I think you mean the " + o.color + " " + o.size + " " + o.cat + ".";
+}
+
+function appGraspKind(kind) {
+  return kind === "grasp" || kind === "pregrasp" || kind === "descend" || kind === "close"
+    || kind === "lift" || kind === "retract" || kind === "reobserve";
+}
+
+function appMarkAlive(ids) {
+  appAlive.fill(0);
+  for (let i = 0; i < ids.length; i++) {
+    const n = +String(ids[i]).slice(1);
+    if (n > 0 && n < appAlive.length) appAlive[n] = 1;
+  }
+}
+
+function appMarkResolved(id) {
+  appHot = id ? +String(id).slice(1) : 0;
+}
+
+function appSegAt(t) {
+  const n = appSegs.length;
+  if (!n) return null;
+  for (let i = 0; i < n; i++) if (t < appSegs[i].t1) return appSegs[i];
+  return appSegs[n - 1];
+}
+
+function appPushSeg(segs, kind, label, dur, extra) {
+  const t0 = segs.length ? segs[segs.length - 1].t1 : 0;
+  const q = { ...appHomeQ };
+  const s = { t0, t1: t0 + dur, kind, label, q0: q, q1: q };
+  if (extra) Object.assign(s, extra);
+  segs.push(s);
+  return s;
+}
+
+function appPlanOf(obj) {
+  if (typeof planGrasp !== "function" || typeof stretchIK !== "function" || !obj) return null;
+  try {
+    const plan = planGrasp(obj);
+    if (!plan) return null;
+    const q = stretchIK(plan.p, plan.yaw);
+    return { plan, q };
+  } catch (e) { return null; }
+}
+
+function appClearGraspTick() {
+  if (!appGraspTick) return;
+  const i = TICKERS.indexOf(appGraspTick);
+  if (i >= 0) TICKERS.splice(i, 1);
+  appGraspTick = null;
+}
+
+function appAppendMotion(segs, obj) {
+  let motion = null;
+  if (typeof graspWaypoints === "function") {
+    try { motion = graspWaypoints(obj, { ...appHomeQ }); }
+    catch (e) { motion = null; }
+  }
+  const tBase = segs.length ? segs[segs.length - 1].t1 : 0;
+  if (motion && motion.length) {
+    let t = tBase;
+    for (let i = 0; i < motion.length; i++) {
+      const s = motion[i];
+      const dur = Math.max(0.05, (s.t1 || 0) - (s.t0 || 0));
+      segs.push({ ...s, t0: t, t1: t + dur });
+      t += dur;
+    }
+    appHasWaypoints = true;
+  } else {
+    const q = { ...appHomeQ };
+    segs.push({ t0: tBase, t1: tBase + 2.4, kind: "grasp", label: "grasp", q0: q, q1: q });
+    appHasWaypoints = false;
+  }
+  appWillGrasp = true;
+  if (appHasWaypoints && typeof graspTicker === "function") {
+    try {
+      const tick = graspTicker(segs, appGroups.get(obj.id) || null, true);
+      if (typeof tick === "function") { appGraspTick = tick; TICKERS.push(tick); }
+    } catch (e) { appGraspTick = null; }
+  }
+}
+
+function appComposeAuto(trial) {
+  const segs = [];
+  appWillGrasp = false;
+  appHasWaypoints = false;
+  appPlan = null;
+  appPushSeg(segs, "listen", trial.instr, 1.5);
+  appPushSeg(segs, "perceive", trial.S0.length + " candidates", 1.0);
+  const rounds = trial.rounds || [];
+  for (let i = 0; i < rounds.length; i++) {
+    appPushSeg(segs, "ask", rounds[i].sel.text, 2.5, { round: i });
+    appPushSeg(segs, "answer", rounds[i].answer, 1.2, { round: i });
+  }
+  if (trial.resolved) appPushSeg(segs, "resolved", trial.outcome, 0.8);
+  else appPushSeg(segs, "unresolved", trial.outcome, 0.8);
+  if (trial.outcome === "correct") {
+    const obj = appResolvedObj();
+    if (obj) {
+      appPlan = appPlanOf(obj);
+      appAppendMotion(segs, obj);
+    }
+  }
+  return segs;
+}
+
+function appClearObjects() {
+  for (let i = 0; i < hcTags.length; i++) {
+    const s = hcTags[i];
+    if (s.parent) s.parent.remove(s);
+    if (s.material) {
+      if (s.material.map) s.material.map.dispose();
+      s.material.dispose();
+    }
+  }
+  hcTags.length = 0;
+  appGroups.clear();
+  if (!appUse3d()) return;
+  const root = MODULES.objects;
+  for (let i = root.children.length - 1; i >= 0; i--) {
+    const g = root.children[i];
+    root.remove(g);
+    g.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.userData && o.userData.appSprite && o.material) {
+        if (o.material.map) o.material.map.dispose();
+        o.material.dispose();
+      }
+    });
+  }
+}
+
+function appMountObjects(placed) {
+  if (!appUse3d()) return;
+  const root = MODULES.objects;
+  for (let i = 0; i < placed.objects.length; i++) {
+    const o = placed.objects[i];
+    const g = makeObject(o);
+    g.position.set(o.x, o.y, TABLE.h);
+    g.rotation.z = o.yaw || 0;
+    g.userData.appId = o.id;
+    root.add(g);
+    appGroups.set(o.id, g);
+  }
+}
+
+function appMaybeSpeak(text) {
+  if (!appSpeech || !text || text === appSpoken) return;
+  appSpoken = text;
+  const syn = window.speechSynthesis;
+  if (!syn || typeof SpeechSynthesisUtterance !== "function") return;
+  try {
+    syn.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1;
+    syn.speak(u);
+  } catch (e) { /* headless, or no voice */ }
+}
+
+function appApplyNow(seg) {
+  const cyc = $("now-cyc");
+  if (!seg) {
+    uiSetNow("robot", "–");
+    uiSetNow("say", "–");
+    uiSetNow("user", "–");
+    if (cyc) cyc.textContent = "";
+    return;
+  }
+  if (cyc && cyc.textContent !== seg.kind) cyc.textContent = seg.kind;
+  if (seg.kind === "listen") {
+    uiSetNow("robot", "Listen", "wait");
+    uiSetNow("say", seg.label || "–", "say");
+    uiSetNow("user", "–");
+  } else if (seg.kind === "perceive") {
+    uiSetNow("robot", "Look", "head");
+    uiSetNow("say", seg.label || "–", "perceive");
+    uiSetNow("user", "–");
+  } else if (seg.kind === "ask") {
+    uiSetNow("robot", "Ask", "question");
+    uiSetNow("say", seg.label || "–", "ask");
+    uiSetNow("user", "–");
+    appMaybeSpeak(seg.label);
+  } else if (seg.kind === "answer") {
+    uiSetNow("robot", "–");
+    uiSetNow("say", "–");
+    uiSetNow("user", seg.label === "yes" ? "Yes" : "No", "answer");
+  } else if (seg.kind === "resolved") {
+    uiSetNow("robot", "Resolved", appTrial && appTrial.resolved ? appTrial.resolved : "");
+    uiSetNow("say", appBelief() || "resolved", "say");
+    uiSetNow("user", "–");
+  } else if (seg.kind === "unresolved") {
+    uiSetNow("robot", "Stop", "unresolved");
+    uiSetNow("say", "Unresolved", "");
+    uiSetNow("user", "–");
+  } else {
+    uiSetNow("robot", seg.label || seg.kind, seg.kind);
+    uiSetNow("say", "–");
+    uiSetNow("user", "–");
+  }
+}
+
+function appSyncAuto(t) {
+  const trial = appTrial;
+  if (!trial) return;
+  const rounds = trial.rounds || [];
+  let answered = 0;
+  for (let i = 0; i < appSegs.length; i++) {
+    if (appSegs[i].kind === "answer" && t >= appSegs[i].t1) answered++;
+  }
+  let S = trial.S0.slice();
+  for (let i = 0; i < answered && i < rounds.length; i++) S = updateState(S, rounds[i].sel, rounds[i].answer);
+  const seg = appSegAt(t);
+  const show = !!(seg && (seg.kind === "resolved" || seg.kind === "unresolved" || appGraspKind(seg.kind)));
+  if (show && trial.resolved) S = [trial.resolved];
+  else if (show) S = [];
+  let round = null;
+  if (seg && seg.round != null) round = rounds[seg.round];
+  else if (rounds.length) round = rounds[Math.min(answered, rounds.length - 1)];
+  const history = [];
+  for (let i = 0; i < answered && i < rounds.length; i++) history.push({ text: rounds[i].sel.text, answer: rounds[i].answer });
+  appShown = {
+    S, props: round ? round.props : [], sel: round ? round.sel : null, history,
+    outcome: show ? trial.outcome : null, resolved: show ? trial.resolved : null,
+    questions: answered, pending: false,
+    belief: show && trial.resolved ? appBelief() : "",
+    phase: seg ? seg.kind : "",
+    roundLabel: round ? "round " + (rounds.indexOf(round) + 1) : "",
+  };
+  appMarkAlive(S);
+  appMarkResolved(show ? trial.resolved : null);
+  hcSyncTags();
+  uiPaint();
+}
+
+function appSyncInteractive() {
+  const done = !!(appIxDone && appTrial);
+  const phase = appPending ? "ask" : (done ? (appTrial.resolved ? "resolved" : "unresolved") : "listen");
+  appShown = {
+    S: appS, props: appProps, sel: appPending || (appRounds.length ? appRounds[appRounds.length - 1].sel : null),
+    history: appHist, outcome: done ? appTrial.outcome : null, resolved: done ? appTrial.resolved : null,
+    questions: appRounds.length, pending: !!appPending,
+    belief: done && appTrial.resolved ? appBelief() : "",
+    phase,
+    roundLabel: appPending ? "round " + (appRounds.length + 1) : (appRounds.length ? "round " + appRounds.length : ""),
+  };
+  appMarkAlive(appS);
+  appMarkResolved(done ? appTrial.resolved : null);
+  hcSyncTags();
+  uiPaint();
+}
+
+function appRowFromTrial(tr) {
+  return {
+    scene: appSceneId, instruction: appInstr ? appInstr.text : "", type: appInstr ? appInstr.type : "",
+    policy: appPolicy, eps: appEps, K: appK, S0: appCands.length,
+    questions: tr ? tr.questions : 0, outcome: tr ? tr.outcome : "",
+    resolved: tr && tr.resolved ? tr.resolved : "", target: appTarget || "",
+  };
+}
+
+function appRecord(row) {
+  appLog.push(row);
+  appLogRow = row;
+}
+
+function appDropPartial() {
+  if (mode !== "interactive" || appIxLogged || !appRounds.length || !appInstr) return;
+  appRecord({
+    scene: appSceneId, instruction: appInstr.text, type: appInstr.type, policy: appPolicy,
+    eps: appEps, K: appK, S0: appCands.length, questions: appRounds.length,
+    outcome: "unresolved", resolved: "", target: appTarget || "",
+  });
+  appIxLogged = true;
+}
+
+function appRunAuto() {
+  appTarget = appDrawTarget(appInstr, appSeed);
+  appTargetChosen = true;
+  appIxDone = true;
+  appIxLogged = true;
+  appTrial = runTrial(appPlaced, appInstr, appTarget, appPolicy, { seed: appSeed, eps: appEps, K: appK });
+  appSegs = appComposeAuto(appTrial);
+  setTimeline(appSegs);
+  setStretch({ ...appHomeQ });
+  appRecord(appRowFromTrial(appTrial));
+  seek(0);
+  setPlaying(true);
+  appSyncAuto(0);
+  appApplyNow(appSegAt(0));
+  appLastSeg = appSegAt(0);
+}
+
+function appDirectResolved() {
+  const dummy = (appInstr.matches && appInstr.matches[0]) || (appPlaced.objects[0] && appPlaced.objects[0].id);
+  if (!dummy) return null;
+  const probe = runTrial(appPlaced, appInstr, dummy, appPolicy, { seed: appSeed, eps: 0, K: appK, slip: 0 });
+  return probe.resolved;
+}
+
+function appAskNext() {
+  const roundSeed = (appSeed + (appRounds.length + 1) * 0x9e3779b1) >>> 0 || 1;
+  const hist = [];
+  for (let i = 0; i < appRounds.length; i++) hist.push(appRounds[i].sel.key);
+  appProps = proposeQuestions(appS, appCands, appPlaced, hist, { K: appK, seed: roundSeed, slip: 0.05 });
+  appPending = selectProp(appPolicy, appProps, roundSeed);
+  if (appPending) appMaybeSpeak(appPending.text);
+}
+
+function appFinishInteractive() {
+  appIxDone = true;
+  appPending = null;
+  const resolved = appS.length === 1 ? appS[0] : null;
+  let outcome;
+  if (!resolved) outcome = appCands.length ? "unresolved" : "none";
+  else if (!appTargetChosen) outcome = "none";
+  else {
+    const c = appCand(resolved);
+    outcome = c && c.obj === appTarget ? "correct" : "wrong";
+  }
+  const fromStart = appRounds.length === 0;
+  appTrial = {
+    scene: appSceneId, instr: appInstr.text, target: appTarget, policy: appPolicy, eps: appEps,
+    S0: appCands.map((c) => c.id), rounds: appRounds, resolved, outcome, questions: appRounds.length,
+  };
+  appClearGraspTick();
+  appSegs = appComposeAuto(appTrial);
+  setTimeline(appSegs);
+  setStretch({ ...appHomeQ });
+  appRecord(appRowFromTrial(appTrial));
+  appIxLogged = true;
+  let resolvedT0 = 0;
+  for (let i = 0; i < appSegs.length; i++) if (appSegs[i].kind === "resolved" || appSegs[i].kind === "unresolved") resolvedT0 = appSegs[i].t0;
+  if (fromStart) { seek(0); setPlaying(true); }
+  else if (appWillGrasp) { seek(resolvedT0); setPlaying(true); }
+  else { seek(resolvedT0); setPlaying(false); }
+  appSyncInteractive();
+  appApplyNow(appSegAt(time));
+  appLastSeg = appSegAt(time);
+  uiDrawLanes();
+}
+
+function appStartInteractive() {
+  appTarget = null;
+  appTargetChosen = false;
+  appTrial = null;
+  appIxDone = false;
+  appIxLogged = false;
+  appRounds = [];
+  appHist = [];
+  appProps = [];
+  appPending = null;
+  appS = appCands.map((c) => c.id);
+  appWillGrasp = false;
+  appPlan = null;
+  appHasWaypoints = false;
+  const info = POLICIES.find((p) => p.id === appPolicy);
+  if (appS.length < 2) { appFinishInteractive(); return; }
+  if (!info || !info.clarifies) {
+    const id = appDirectResolved();
+    appS = id ? [id] : [];
+    appFinishInteractive();
+    return;
+  }
+  appAskNext();
+  if (!appPending) { appFinishInteractive(); return; }
+  appSegs = [];
+  appPushSeg(appSegs, "listen", appInstr.text, 1.5);
+  appPushSeg(appSegs, "perceive", appCands.length + " candidates", 1.0);
+  appPushSeg(appSegs, "ask", appPending.text, 6);
+  setTimeline(appSegs);
+  setStretch({ ...appHomeQ });
+  seek(0);
+  setPlaying(true);
+  appSyncInteractive();
+  appApplyNow(appSegAt(0));
+  appLastSeg = appSegAt(0);
+}
+
+function appAnswer(ans) {
+  if (mode !== "interactive" || !appPending || appIxDone) return;
+  if (ans !== "yes" && ans !== "no") return;
+  const sel = appPending;
+  appRounds.push({ S: appS.slice(), props: appProps, sel, answer: ans });
+  appHist.push({ text: sel.text, answer: ans });
+  appS = updateState(appS, sel, ans);
+  appPending = null;
+  if (appS.length <= 1) { appFinishInteractive(); return; }
+  appAskNext();
+  if (!appPending) { appFinishInteractive(); return; }
+  for (let i = 0; i < appSegs.length; i++) if (appSegs[i].kind === "ask") appSegs[i].label = appPending.text;
+  appSyncInteractive();
+  appApplyNow(appSegAt(time));
+  uiDrawLanes();
+}
+
+function appChooseTarget(id) {
+  if (mode !== "interactive") return;
+  appTarget = id;
+  appTargetChosen = true;
+  if (appIxDone && appTrial && appTrial.resolved) {
+    const c = appCand(appTrial.resolved);
+    appTrial.outcome = c && c.obj === id ? "correct" : "wrong";
+    appTrial.target = id;
+    if (appLogRow) { appLogRow.outcome = appTrial.outcome; appLogRow.target = id; }
+    appSyncInteractive();
+    return;
+  }
+  const note = $("app-target-note");
+  if (note) note.textContent = "Hidden target set.";
+}
+
+function appRebuild() {
+  appDropPartial();
+  appClearGraspTick();
+  appClearObjects();
+  appSpoken = "";
+  appWillGrasp = false;
+  appHasWaypoints = false;
+  appPlan = null;
+  appPending = null;
+  appIxDone = false;
+  appRounds = [];
+  appHist = [];
+  appProps = [];
+  appS = [];
+  appTrial = null;
+  appLastSeg = null;
+  let src = null;
+  for (let i = 0; i < SCENES.length; i++) if (SCENES[i].id === appSceneId) { src = SCENES[i]; break; }
+  const pool = src ? (INSTRUCTIONS[src.id] || []) : [];
+  const idx = pool.length ? Math.max(0, Math.min(appInstrIndex, pool.length - 1)) : 0;
+  const instr = pool.length ? pool[idx] : null;
+  if (!src || !instr) {
+    appPlaced = null; appInstr = null; appCands = []; appSegs = [];
+    uiPaint(); uiDrawLanes(); return;
+  }
+  let placed;
+  try { placed = layoutScene(src, appSeed); }
+  catch (e) {
+    appPlaced = null; appCands = []; appSegs = [];
+    uiPaint(); uiDrawLanes(); return;
+  }
+  appPlaced = placed;
+  appInstr = instr;
+  appInstrIndex = idx;
+  appCands = initialCandidates(placed, instr, appSeed >>> 0);
+  appMountObjects(placed);
+  hcRebuildTags();
+  hcPrepOverlay();
+  if (mode === "auto") appRunAuto();
+  else appStartInteractive();
+  uiDrawLanes();
+}
+
+function appShowRanges() {
+  const eps = $("app-eps"), k = $("app-k");
+  if ($("app-eps-out") && eps) $("app-eps-out").textContent = Number(eps.value).toFixed(2);
+  if ($("app-k-out") && k) $("app-k-out").textContent = String(Math.round(Number(k.value)));
+}
+
+function appReadForm() {
+  appSet = $("app-set").value || "offline";
+  appSceneId = $("app-scene").value || appSceneId;
+  const idx = Number($("app-instr").value);
+  appInstrIndex = Number.isFinite(idx) ? idx : 0;
+  appPolicy = $("app-policy").value || "activask";
+  appEps = Math.min(0.2, Math.max(0, Number($("app-eps").value) || 0));
+  appK = Math.min(5, Math.max(1, Math.round(Number($("app-k").value) || 4)));
+  const seed = Math.round(Number($("app-seed").value));
+  appSeed = Number.isFinite(seed) && seed >= 1 ? seed : 1;
+  appSpeech = !!($("app-speech") && $("app-speech").checked);
+}
+
+function appFillScenes() {
+  const sel = $("app-scene");
+  const set = $("app-set").value;
+  const prev = appSceneId;
+  sel.replaceChildren();
+  for (let i = 0; i < SCENES.length; i++) {
+    const s = SCENES[i];
+    if (s.set !== set) continue;
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = s.id + " · " + s.family;
+    sel.appendChild(o);
+  }
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+
+function appFillPolicies() {
+  const sel = $("app-policy");
+  const set = $("app-set").value;
+  const prev = appPolicy;
+  sel.replaceChildren();
+  for (let i = 0; i < POLICIES.length; i++) {
+    const p = POLICIES[i];
+    if (set === "online" && !p.online) continue;
+    const o = document.createElement("option");
+    o.value = p.id;
+    o.textContent = p.label;
+    o.title = p.rule;
+    sel.appendChild(o);
+  }
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  else if ([...sel.options].some((o) => o.value === "activask")) sel.value = "activask";
+}
+
+function appFillInstr(keep) {
+  const sel = $("app-instr");
+  const id = $("app-scene").value;
+  const prev = sel.value;
+  const pool = INSTRUCTIONS[id] || [];
+  sel.replaceChildren();
+  const groups = {};
+  for (let i = 0; i < INSTR_TYPES.length; i++) {
+    const g = document.createElement("optgroup");
+    g.label = INSTR_TYPES[i];
+    groups[INSTR_TYPES[i]] = g;
+    sel.appendChild(g);
+  }
+  for (let i = 0; i < pool.length; i++) {
+    const ins = pool[i];
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = ins.text;
+    o.title = ins.text;
+    (groups[ins.type] || sel).appendChild(o);
+  }
+  if (keep && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  else {
+    let amb = 0;
+    for (let i = 0; i < pool.length; i++) if (pool[i].type === "ambiguous") { amb = i; break; }
+    sel.value = String(amb);
+  }
+}
+
+function appOnForm(e) {
+  if (appFilling) return;
+  const t = e && e.target;
+  if (t && t.id === "app-speech") {
+    appSpeech = !!t.checked;
+    if (appSpeech) { appSpoken = ""; appMaybeSpeak(appPending ? appPending.text : ""); }
+    return;
+  }
+  const setNow = $("app-set").value;
+  if (setNow !== appSet) {
+    appFilling = true;
+    appFillScenes();
+    appFillPolicies();
+    appFillInstr(false);
+    appFilling = false;
+  } else if (t && t.id === "app-scene") {
+    appFilling = true;
+    appFillInstr(false);
+    appFilling = false;
+  }
+  appReadForm();
+  appShowRanges();
+  appRebuild();
+}
+
+function appNewTrial() {
+  const set = $("app-set").value || "offline";
+  const scenes = [];
+  for (let i = 0; i < SCENES.length; i++) if (SCENES[i].set === set) scenes.push(SCENES[i]);
+  if (!scenes.length) return;
+  const r = rng(appFreshSeed());
+  const scene = scenes[Math.floor(r() * scenes.length)];
+  const pool = INSTRUCTIONS[scene.id] || [];
+  const idx = pool.length ? Math.floor(r() * pool.length) : 0;
+  const seed = (Math.floor(r() * 0x7ffffffe) + 1) >>> 0;
+  appFilling = true;
+  $("app-scene").value = scene.id;
+  appFillInstr(false);
+  $("app-instr").value = String(idx);
+  $("app-seed").value = String(seed || 1);
+  appFilling = false;
+  appReadForm();
+  appShowRanges();
+  appRebuild();
+}
+
+function appBindPointer() {
+  const node = renderer.domElement;
+  node.addEventListener("pointerdown", (e) => { appDownX = e.clientX; appDownY = e.clientY; });
+  node.addEventListener("pointerup", (e) => {
+    if (mode !== "interactive" || e.button !== 0) return;
+    if (Math.hypot(e.clientX - appDownX, e.clientY - appDownY) > 5) return;
+    const rect = node.getBoundingClientRect();
+    appPtr.x = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+    appPtr.y = -((e.clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+    appRay.setFromCamera(appPtr, camera);
+    const hits = appRay.intersectObject(MODULES.objects, true);
+    for (let i = 0; i < hits.length; i++) {
+      let n = hits[i].object;
+      while (n && n !== MODULES.objects) {
+        if (n.userData && n.userData.appId) { appChooseTarget(n.userData.appId); return; }
+        n = n.parent;
+      }
+    }
+  });
+}
+
+function appOnKey(e) {
+  if (mode !== "interactive" || e.repeat) return;
+  if (e.target && e.target.closest && e.target.closest("input, select, textarea")) return;
+  if (e.key === "y" || e.key === "Y") { e.preventDefault(); appAnswer("yes"); }
+  else if (e.key === "n" || e.key === "N") { e.preventDefault(); appAnswer("no"); }
+}
+
+function appTick(t) {
+  const seg = appSegAt(t);
+  if (mode === "interactive" && !appIxDone && playing && !scrubbing && seg && seg.kind === "ask") {
+    setPlaying(false);
+    if (t > seg.t0) seek(seg.t0);
+  }
+  if (seg === appLastSeg) return;
+  appLastSeg = seg;
+  appApplyNow(seg);
+  if (mode === "auto") appSyncAuto(t);
+}
+
+function appBoot() {
+  appReady = true;
+  const form = $("app-form");
+  form.addEventListener("submit", (e) => e.preventDefault());
+  form.addEventListener("input", (e) => {
+    if (e.target.id === "app-eps" || e.target.id === "app-k") appShowRanges();
+  });
+  form.addEventListener("change", appOnForm);
+  $("app-new").addEventListener("click", appNewTrial);
+  appFilling = true;
+  $("app-set").value = "offline";
+  appFillScenes();
+  $("app-scene").value = "off-cups-01";
+  appFillPolicies();
+  $("app-policy").value = "activask";
+  appFillInstr(false);
+  $("app-eps").value = "0";
+  $("app-k").value = "4";
+  $("app-seed").value = "1";
+  appShowRanges();
+  appFilling = false;
+  appReadForm();
+  appBindPointer();
+  document.addEventListener("keydown", appOnKey);
+  TICKERS.push(appTick);
+  appRebuild();
+}
+
+const appSetMode = setMode;
+setMode = function (m) {
+  if (appReady && mode === "interactive" && m !== "interactive") appDropPartial();
+  appSetMode(m);
+  if (appReady) appRebuild();
+};
+
+queueMicrotask(appBoot);
+// ================================================================ head camera (prefix hc)
+// Renders stretchHeadCam() into #cam-canvas at <= 5 Hz while the Camera panel is open.
+// Cand.box is the perception pinhole (CAM_POSE). The check projects each object centre
+// with this same three.js camera and requires it inside that box.
+
+let hcCam = null;
+let hcTarget = null;
+let hcCtx = null;
+let hcImg = null;
+let hcBuf = null;
+let hcStamp = 0;
+const hcTags = [];
+const hcLabels = [];
+const hcStroke = [];
+const hcDash = [6, 4];
+const hcSolid = [];
+const hcPos = new THREE.Vector3();
+const hcLook = new THREE.Vector3();
+const hcTmp = new THREE.Vector3();
+const hcVp = new THREE.Vector4();
+const hcSc = new THREE.Vector4();
+
+function hcAim() {
+  const h = stretchHeadCam();
+  hcPos.set(h.pos[0], h.pos[2], -h.pos[1]);
+  hcLook.set(h.look[0], h.look[2], -h.look[1]);
+  hcCam.position.copy(hcPos);
+  hcCam.up.set(0, 1, 0);
+  hcCam.lookAt(hcLook);
+  hcCam.updateMatrixWorld(true);
+}
+
+function hcMakeSprite(disp) {
+  const c = document.createElement("canvas");
+  c.width = 128; c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "#c4531a";
+  g.beginPath();
+  g.arc(64, 64, 54, 0, Math.PI * 2);
+  g.fill();
+  g.lineWidth = 6;
+  g.strokeStyle = "#ffffff";
+  g.stroke();
+  g.fillStyle = "#ffffff";
+  g.font = "700 72px sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.lineWidth = 6;
+  g.strokeStyle = "#1a100c";
+  g.strokeText(String(disp), 64, 70);
+  g.fillText(String(disp), 64, 70);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+  const s = new THREE.Sprite(mat);
+  s.scale.set(0.09, 0.09, 1);
+  s.renderOrder = 20;
+  s.castShadow = false;
+  s.receiveShadow = false;
+  s.name = "tag-c" + disp;
+  s.userData.appSprite = true;
+  s.userData.hcDisp = disp;
+  return s;
+}
+
+function hcRebuildTags() {
+  for (let i = 0; i < hcTags.length; i++) {
+    const s = hcTags[i];
+    if (s.parent) s.parent.remove(s);
+    if (s.material) {
+      if (s.material.map) s.material.map.dispose();
+      s.material.dispose();
+    }
+  }
+  hcTags.length = 0;
+  if (!appUse3d()) return;
+  for (let i = 0; i < appCands.length; i++) {
+    const c = appCands[i];
+    const o = appObj(c.obj);
+    const group = appGroups.get(c.obj);
+    if (!o || !group) continue;
+    const s = hcMakeSprite(c.disp);
+    // Scene space, not under world: a sprite parented to the -90° cell frame
+    // lies flat and casts a square shadow across the cup.
+    const z = TABLE.h + dimsOf(o).h + 0.08;
+    s.position.set(o.x, z, -o.y);
+    scene.add(s);
+    hcTags.push(s);
+  }
+}
+
+function hcSyncTags() {
+  for (let i = 0; i < hcTags.length; i++) {
+    const s = hcTags[i];
+    const n = s.userData.hcDisp;
+    const alive = appAlive[n] === 1;
+    const hot = appHot === n;
+    const opacity = alive ? 1 : 0.28;
+    if (s.material.opacity !== opacity) s.material.opacity = opacity;
+    s.material.color.setHex(alive ? 0xffffff : 0x9a9a9a);
+    const sc = hot ? 0.11 : 0.09;
+    if (s.scale.x !== sc) s.scale.set(sc, sc, 1);
+  }
+}
+
+function hcPrepOverlay() {
+  const n = appCands.length;
+  hcLabels.length = n;
+  hcStroke.length = n;
+  for (let i = 0; i < n; i++) {
+    const c = appCands[i];
+    const o = appObj(c.obj);
+    hcLabels[i] = c.disp + "  " + c.score.toFixed(2);
+    hcStroke[i] = uiHex(o && o.color);
+  }
+}
+
+function hcBlit() {
+  const w = CAM.w, h = CAM.h, row = w * 4;
+  const src = hcBuf, dst = hcImg.data;
+  for (let y = 0; y < h; y++) dst.set(src.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+  hcCtx.putImageData(hcImg, 0, 0);
+}
+
+function hcDrawBoxes() {
+  const g = hcCtx;
+  g.font = "600 15px sans-serif";
+  g.textBaseline = "alphabetic";
+  for (let i = 0; i < appCands.length; i++) {
+    const c = appCands[i];
+    const b = c.box;
+    if (!b) continue;
+    const x = b[0], y = b[1], w = b[2] - b[0], h = b[3] - b[1];
+    const alive = appAlive[c.disp] === 1;
+    const hot = appHot === c.disp;
+    g.lineWidth = hot ? 4 : 2;
+    g.strokeStyle = !alive ? "rgba(150,150,150,0.95)" : (hot ? "#ff8a4c" : (hcStroke[i] || "#c4531a"));
+    g.setLineDash(alive ? hcSolid : hcDash);
+    g.strokeRect(x, y, w, h);
+    const text = hcLabels[i] || String(c.disp);
+    const tw = g.measureText(text).width;
+    const ly = y >= 20 ? y - 18 : y + 2;
+    g.setLineDash(hcSolid);
+    g.fillStyle = !alive ? "rgba(60,60,60,0.8)" : "rgba(20,16,14,0.82)";
+    g.fillRect(x, ly, tw + 8, 16);
+    g.fillStyle = "#ffffff";
+    g.fillText(text, x + 4, ly + 13);
+  }
+}
+
+function hcRender() {
+  if (!hcCam || !hcCtx) return;
+  const now = performance.now();
+  if (now - hcStamp < 200) return;
+  hcStamp = now;
+  for (let i = 0; i < hcTags.length; i++) hcTags[i].visible = false;
+  const prevTarget = renderer.getRenderTarget();
+  const prevClear = renderer.autoClear;
+  const scTest = renderer.getScissorTest();
+  renderer.getViewport(hcVp);
+  renderer.getScissor(hcSc);
+  try {
+    hcAim();
+    renderer.autoClear = true;
+    renderer.setScissorTest(false);
+    renderer.setRenderTarget(hcTarget);
+    renderer.clear();
+    renderer.render(scene, hcCam);
+    renderer.readRenderTargetPixels(hcTarget, 0, 0, CAM.w, CAM.h, hcBuf);
+  } finally {
+    renderer.setRenderTarget(prevTarget);
+    renderer.setViewport(hcVp.x, hcVp.y, hcVp.z, hcVp.w);
+    renderer.setScissor(hcSc.x, hcSc.y, hcSc.z, hcSc.w);
+    renderer.setScissorTest(scTest);
+    renderer.autoClear = prevClear;
+    for (let i = 0; i < hcTags.length; i++) hcTags[i].visible = true;
+  }
+  hcBlit();
+  hcDrawBoxes();
+}
+
+function hcTick() {
+  if (!hcCam || !panelOpen("camera-card")) return;
+  hcRender();
+}
+
+function hcCheckBoxes() {
+  if (!hcCam) return { ok: false, detail: "head camera is not ready" };
+  if (!appCands.length) return { ok: true, detail: "no candidates" };
+  hcAim();
+  let worst = 0, bad = 0;
+  const bits = [];
+  for (let i = 0; i < appCands.length; i++) {
+    const c = appCands[i];
+    const o = appObj(c.obj);
+    if (!o || !c.box) { bad++; bits.push(c.id + " missing"); continue; }
+    const z = TABLE.h + dimsOf(o).h * 0.5;
+    hcTmp.set(o.x, z, -o.y);
+    hcTmp.project(hcCam);
+    const u = (hcTmp.x * 0.5 + 0.5) * CAM.w;
+    const v = (0.5 - hcTmp.y * 0.5) * CAM.h;
+    const b = c.box;
+    const du = u < b[0] ? b[0] - u : (u > b[2] ? u - b[2] : 0);
+    const dv = v < b[1] ? b[1] - v : (v > b[3] ? v - b[3] : 0);
+    const out = Math.hypot(du, dv);
+    if (out > worst) worst = out;
+    const behind = hcTmp.z < -1 || hcTmp.z > 1;
+    if (behind || out > 3) {
+      bad++;
+      bits.push(c.id + " (" + u.toFixed(0) + "," + v.toFixed(0) + ") off " + out.toFixed(1) + "px");
+    }
+  }
+  return {
+    ok: bad === 0,
+    detail: bad ? bits.join("; ") : appCands.length + " centres inside, max outside " + worst.toFixed(2) + " px",
+  };
+}
+
+function hcBoot() {
+  const canvas = $("cam-canvas");
+  if (!canvas) return;
+  hcCtx = canvas.getContext("2d", { willReadFrequently: true });
+  hcImg = hcCtx.createImageData(CAM.w, CAM.h);
+  hcCam = new THREE.PerspectiveCamera(CAM.vfov, CAM.w / CAM.h, 0.05, 12);
+  hcTarget = new THREE.WebGLRenderTarget(CAM.w, CAM.h, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    depthBuffer: true,
+    stencilBuffer: false,
+    samples: 0,
+    magFilter: THREE.LinearFilter,
+    minFilter: THREE.LinearFilter,
+  });
+  hcTarget.texture.colorSpace = THREE.SRGBColorSpace;
+  hcBuf = new Uint8Array(CAM.w * CAM.h * 4);
+  TICKERS.push(hcTick);
+  CHECKS.push({ name: "headcam boxes", run: hcCheckBoxes });
+}
+
+queueMicrotask(hcBoot);
+// ================================================================ Experiments panel (prefix exu)
+// Renders into #exp and writes the headline offline accuracy into #report [data-twin].
+// Headline twin numbers are the mean of seeds 1..5 (paper protocol). The controls run
+// one seed and that batch is detail. Mean |S0|, the multi-candidate rate and the
+// clarifying policies' asked rate by type are calibrated (the detector bands were fitted
+// to them). Every other twin number is out-of-sample.
+// Every twin figure is simulated and is drawn beside the paper's measured number.
+// No Math.random: batches use the seeded protocol in 15-experiments.js.
+// This file is concatenated before 70-loop.js, so CHECKS and window.pc are used
+// from the load microtask, after that file has published them.
+
+const EXU_COLOR = {
+  firstQ: "var(--scara)",
+  randomQ: "var(--delta)",
+  vlmQ: "var(--vision)",
+  activask: "var(--accent)",
+};
+const EXU_SHORT = {
+  top: "Top",
+  random: "Random",
+  directVLM: "Direct",
+  firstQ: "First Q",
+  randomQ: "Random Q",
+  vlmQ: "VLM Q",
+  activask: "ActivAsk",
+};
+const EXU_HEAD_SEEDS = [1, 2, 3, 4, 5];
+const EXU_PAIRED = "The batch is paired, so the four clarifying policies have identical accuracy and asked rate by construction; only their question counts differ.";
+
+let exuLast = null;
+let exuHead = null;
+
+function exuEsc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+}
+
+function exuFmt(v, d = 2) {
+  if (v == null || !Number.isFinite(Number(v))) return "–";
+  return Number(v).toFixed(d);
+}
+
+function exuInt(v) {
+  if (v == null || !Number.isFinite(Number(v))) return "–";
+  return String(Math.round(Number(v)));
+}
+
+function exuCi(ci) {
+  if (!ci || ci.length < 2) return "–";
+  return `${exuFmt(ci[0])}–${exuFmt(ci[1])}`;
+}
+
+function exuMean(values) {
+  const xs = [];
+  for (const v of values) if (v != null && Number.isFinite(Number(v))) xs.push(Number(v));
+  if (!xs.length) return null;
+  let s = 0;
+  for (const v of xs) s += v;
+  return s / xs.length;
+}
+
+function exuPolicy(id) {
+  return POLICIES.find((p) => p.id === id) || { id, label: id };
+}
+
+function exuClarifyIds() {
+  return POLICIES.filter((p) => p.clarifies).map((p) => p.id);
+}
+
+// Published by-type asked % is pooled over every method. Three of the seven never ask,
+// so the clarifying policies' rate — the row the detector was fitted to — is that
+// pooled figure times 7/4.
+function exuPaperClarifyAsked(type) {
+  const nClarify = exuClarifyIds().length || 1;
+  return PAPER.byType[type].asked * POLICIES.length / nClarify;
+}
+
+function exuControls() {
+  const set = $("exu-set").value === "online" ? "online" : "offline";
+  const num = (id, fallback, lo, hi, integer) => {
+    const v = Number($(id).value);
+    if (!Number.isFinite(v)) return fallback;
+    const c = Math.min(hi, Math.max(lo, v));
+    return integer ? Math.round(c) : c;
+  };
+  return {
+    set,
+    seed: num("exu-seed", 11, 1, 1e9, true),
+    eps: num("exu-eps", 0, 0, 1, false),
+    K: num("exu-k", PARAMS.K, 1, 5, true),
+    slip: num("exu-slip", 0.05, 0, 1, false),
+  };
+}
+
+function exuByType(trials) {
+  const out = {};
+  for (const type of INSTR_TYPES) out[type] = { n: 0, correct: 0, askedN: 0, qAskedSum: 0 };
+  for (const t of trials || []) {
+    const b = out[t.type];
+    if (!b) continue;
+    b.n++;
+    if (t.outcome === "correct") b.correct++;
+    if ((t.questions || 0) > 0) { b.askedN++; b.qAskedSum += t.questions; }
+  }
+  for (const type of INSTR_TYPES) {
+    const b = out[type];
+    b.acc = b.n ? (100 * b.correct) / b.n : 0;
+    b.asked = b.n ? (100 * b.askedN) / b.n : 0;
+    b.qAsked = b.askedN ? b.qAskedSum / b.askedN : null;
+  }
+  return out;
+}
+
+// Mean of several offline batches. Accuracy is the mean of the per-seed rates.
+// accLo/accHi is the range across seeds, not a Wilson interval.
+function exuAverage(batches) {
+  const summary = {};
+  for (const p of POLICIES) {
+    const rows = batches.map((b) => b.summary[p.id]);
+    const accs = rows.map((r) => r.acc);
+    summary[p.id] = {
+      n: rows[0].n,
+      acc: exuMean(accs),
+      accLo: Math.min(...accs),
+      accHi: Math.max(...accs),
+      asked: exuMean(rows.map((r) => r.asked)),
+      qAll: exuMean(rows.map((r) => r.qAll)),
+      qAsked: exuMean(rows.map((r) => r.qAsked)),
+      meanS0: exuMean(rows.map((r) => r.meanS0)),
+      multi: exuMean(rows.map((r) => r.multi)),
+      byType: {},
+    };
+    for (const type of INSTR_TYPES) {
+      const bt = rows.map((r) => r.byType[type]);
+      summary[p.id].byType[type] = {
+        n: bt[0].n,
+        acc: exuMean(bt.map((r) => r.acc)),
+        asked: exuMean(bt.map((r) => r.asked)),
+        qAsked: exuMean(bt.map((r) => r.qAsked)),
+      };
+    }
+  }
+  const pooled = {};
+  const clarify = {};
+  const perSeed = batches.map((b) => exuByType(b.trials));
+  for (const type of INSTR_TYPES) {
+    pooled[type] = {
+      n: perSeed[0][type].n,
+      acc: exuMean(perSeed.map((s) => s[type].acc)),
+      asked: exuMean(perSeed.map((s) => s[type].asked)),
+      qAsked: exuMean(perSeed.map((s) => s[type].qAsked)),
+    };
+    const bt = batches.map((b) => b.summary.activask.byType[type]);
+    clarify[type] = {
+      n: bt[0].n,
+      asked: exuMean(bt.map((r) => r.asked)),
+      acc: exuMean(bt.map((r) => r.acc)),
+      qAsked: exuMean(bt.map((r) => r.qAsked)),
+    };
+  }
+  return { summary, pooled, clarify, meanS0: summary.activask.meanS0, multi: summary.activask.multi };
+}
+
+function exuTag(kind) {
+  if (kind === "calibrated") {
+    return `<span class="exu-tag exu-cal" title="Detector bands were fitted to this. Agreement is by construction.">calibrated</span>`;
+  }
+  return `<span class="exu-tag" title="Not a fitted row.">out-of-sample</span>`;
+}
+
+function exuPair(paper, twin, title, tag) {
+  const badge = twin === "–" ? "" : `<span class="exu-sim">sim</span>`;
+  const tip = title ? ` title="${exuEsc(title)}"` : "";
+  const mark = tag ? exuTag(tag) : "";
+  return `<td${tip}><span class="exu-p">${paper}</span><span class="exu-t">${twin}</span>${badge}${mark}</td>`;
+}
+
+function exuNameCell(id, span) {
+  const p = exuPolicy(id);
+  const rows = span ? ` rowspan="${span}"` : "";
+  return `<td class="exu-name"${rows} title="${exuEsc(p.label)}">${exuEsc(EXU_SHORT[id] || p.label)}</td>`;
+}
+
+// One number per line. The paper row is muted; the twin row carries the sim mark.
+// A confidence interval stays on its own line so it is not cut at the dash.
+// `tag` is "calibrated" or "oos" and is drawn under the twin number, not inside it.
+function exuSide(text, ci, twin, title, tag) {
+  const tip = title ? ` title="${exuEsc(title)}"` : "";
+  const badge = twin && text !== "–" ? `<span class="exu-sim">sim</span>` : "";
+  const line = ci ? `<span class="exu-ci">${ci}</span>` : "";
+  const mark = twin && tag ? exuTag(tag) : "";
+  return `<td${tip}><span class="${twin ? "exu-t" : "exu-p"}">${text}</span>${badge}${line}${mark}</td>`;
+}
+
+function exuOfflineTable(summary, mode) {
+  const headline = mode === "headline";
+  const rows = POLICIES.map((p) => {
+    const paper = PAPER.offline[p.id];
+    const twin = summary[p.id];
+    if (!paper || !twin) return "";
+    const accTip = headline
+      ? `mean of seeds 1–5 ${exuFmt(twin.acc)} · range ${exuFmt(twin.accLo)}–${exuFmt(twin.accHi)} · out-of-sample · twin (simulated)`
+      : `paper ${exuFmt(paper.acc)} [${exuCi(paper.ci)}] · twin (simulated) ${exuFmt(twin.acc)} [${exuCi(twin.ci)}] · out-of-sample`;
+    const ci = headline ? "" : exuCi(twin.ci);
+    const oos = "out-of-sample · twin (simulated)";
+    return `<tr>${exuNameCell(p.id, 2)}
+      ${exuSide(exuFmt(paper.acc), exuCi(paper.ci), false, accTip)}
+      ${exuSide(exuFmt(paper.asked), "", false, "asked %")}
+      ${exuSide(exuFmt(paper.qAll), "", false, "mean questions, all trials")}
+      ${exuSide(paper.qAsked == null ? "–" : exuFmt(paper.qAsked), "", false, "mean questions on asked trials")}</tr>
+    <tr class="exu-twin">
+      ${exuSide(exuFmt(twin.acc), ci, true, accTip)}
+      ${exuSide(exuFmt(twin.asked), "", true, `asked % · ${oos}`)}
+      ${exuSide(exuFmt(twin.qAll), "", true, `mean questions, all trials · ${oos}`)}
+      ${exuSide(exuFmt(twin.qAsked), "", true, `mean questions on asked trials · ${oos}`)}</tr>`;
+  }).join("");
+  const heading = headline
+    ? `Offline, seeds 1–5 <em>mean · out-of-sample</em>`
+    : `This seed <em>detail · out-of-sample</em>`;
+  const accHead = headline ? "Acc %" : "Acc % ± CI";
+  return `<h3 class="sec-h">${heading}</h3>
+    <table class="grid exu-metrics"><colgroup><col class="exu-c-name"><col class="exu-c-acc"><col><col><col></colgroup>
+    <thead><tr><th>Policy</th><th>${accHead}</th><th>Asked %</th><th>Q all</th><th>Q asked</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small-note">${EXU_PAIRED}</p>`;
+}
+
+function exuOnlineTable(summary) {
+  const rows = POLICIES.filter((p) => p.online).map((p) => {
+    const paper = PAPER.online[p.id];
+    const twin = summary[p.id];
+    if (!paper || !twin) return "";
+    const oos = "out-of-sample · twin (simulated)";
+    const accTip = `target % · paper ${exuCi(paper.targetCi)} · twin (simulated) ${exuCi(twin.ci)} · out-of-sample`;
+    const graspTip = `grasp % · paper ${exuCi(paper.graspCi)} · twin (simulated) ${exuCi(twin.graspCi)} · out-of-sample`;
+    const fullTip = `full-task % · paper ${exuCi(paper.fullCi)} · twin (simulated) ${exuCi(twin.fullCi)} · Q asked paper ${paper.q == null ? "–" : exuFmt(paper.q)}, twin (simulated) ${exuFmt(twin.qAsked)} · out-of-sample`;
+    return `<tr>${exuNameCell(p.id, 2)}
+      ${exuSide(exuFmt(paper.targetAcc), "", false, accTip)}
+      ${exuSide(exuInt(paper.attempts), "", false, "grasp attempts")}
+      ${exuSide(exuFmt(paper.grasp), "", false, graspTip)}
+      ${exuSide(exuFmt(paper.full), "", false, fullTip)}
+      ${exuSide(exuInt(paper.nonExec), "", false, "not executed")}</tr>
+    <tr class="exu-twin">
+      ${exuSide(exuFmt(twin.acc), "", true, accTip)}
+      ${exuSide(exuInt(twin.attempts), "", true, `grasp attempts · ${oos}`)}
+      ${exuSide(exuFmt(twin.grasp), "", true, graspTip)}
+      ${exuSide(exuFmt(twin.full), "", true, fullTip)}
+      ${exuSide(exuInt(twin.nonExec), "", true, `not executed · ${oos}`)}</tr>`;
+  }).join("");
+  return `<h3 class="sec-h">Online, this seed <em>detail · out-of-sample</em></h3>
+    <table class="grid exu-metrics exu-online"><colgroup><col class="exu-c-name"><col class="exu-c-acc"><col><col><col><col></colgroup>
+    <thead><tr><th>Policy</th><th>Target %</th><th>Tries</th><th>Grasp %</th><th>Full %</th><th>Skip</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small-note">Grasp success is a category-rate draw from the paper. Out-of-sample. A wrong or unresolved target is not executed.</p>`;
+}
+
+function exuTypeTable(view) {
+  const label = { clear: "Clear", partial: "Partial", ambiguous: "Ambiguous" };
+  const rows = INSTR_TYPES.map((type) => {
+    const paper = PAPER.byType[type];
+    const pool = view.pooled[type];
+    const askedPaper = exuPaperClarifyAsked(type);
+    const askedTwin = view.clarify[type].asked;
+    const accTip = `accuracy % · pooled over methods · paper ${exuFmt(paper.acc)} · twin ${exuFmt(pool.acc)} · out-of-sample`;
+    const askedTip = `clarifying policies' asked % · paper pooled ${exuFmt(paper.asked)} × ${POLICIES.length}/${exuClarifyIds().length} = ${exuFmt(askedPaper)} · twin ${exuFmt(askedTwin)} · calibrated · agreement by construction`;
+    const qPaper = paper.qAsked == null ? "–" : exuFmt(paper.qAsked);
+    const qTip = `mean questions on asked trials · paper ${qPaper} · twin ${exuFmt(pool.qAsked)} · out-of-sample`;
+    return `<tr><td class="exu-name">${label[type]}</td>${exuPair(exuFmt(paper.acc), exuFmt(pool.acc), accTip)}${exuPair(exuFmt(askedPaper), exuFmt(askedTwin), askedTip, "calibrated")}${exuPair(qPaper, exuFmt(pool.qAsked), qTip)}</tr>`;
+  }).join("");
+  return `<h3 class="sec-h">By instruction type <em>asked rate calibrated</em></h3>
+    <table class="grid exu-metrics"><thead><tr><th>Type</th><th>Acc %</th><th>Asked %</th><th>Q asked</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small-note">Asked % is the clarifying policies only, and it is calibrated. The paper figure is the published pooled rate times 7/4. Acc % and Q asked are out-of-sample.</p>`;
+}
+
+function exuCalibrated(view) {
+  const s0Tip = `mean |S0| · paper ${exuFmt(PAPER.offlineSet.meanS0)} · twin ${exuFmt(view.meanS0)} · calibrated · detector bands were fitted to this row`;
+  const multiTip = `multi-candidate % · paper ${exuFmt(PAPER.offlineSet.multiCandidate.pct)} · twin ${exuFmt(view.multi)} · calibrated · detector bands were fitted to this row`;
+  return `<h3 class="sec-h">Fitted rows <em>calibrated</em></h3>
+    <table class="grid exu-metrics"><colgroup><col class="exu-c-name"><col><col></colgroup>
+    <thead><tr><th>Row</th><th>Paper</th><th>Twin</th></tr></thead><tbody>
+    <tr><td class="exu-name">mean |S0|</td>${exuSide(exuFmt(PAPER.offlineSet.meanS0), "", false, s0Tip)}${exuSide(exuFmt(view.meanS0), "", true, s0Tip, "calibrated")}</tr>
+    <tr><td class="exu-name">multi %</td>${exuSide(exuFmt(PAPER.offlineSet.multiCandidate.pct), "", false, multiTip)}${exuSide(exuFmt(view.multi), "", true, multiTip, "calibrated")}</tr>
+    </tbody></table>
+    <p class="small-note">The detector bands were fitted to mean |S0|, the multi-candidate rate and the clarifying policies' asked rate by type. Agreement there is by construction.</p>`;
+}
+
+function exuHeadlineBlock(head) {
+  if (!head) return "";
+  return `<p class="small-note">Headline · mean of seeds 1–5 · ${head.ms.toFixed(0)} ms · ε 0 · K ${PARAMS.K} · slip 0.05</p>`
+    + exuCalibrated(head)
+    + exuOfflineTable(head.summary, "headline")
+    + exuTypeTable(head);
+}
+
+function exuLegend(items) {
+  return `<div class="exu-leg">${items.map((it) => `<span><i class="exu-sw" style="border-top-color:${it.color};border-top-style:${it.dash ? "dashed" : "solid"}"></i>${exuEsc(it.name)}</span>`).join("")}</div>`;
+}
+
+// Inline SVG. Colours are the page's CSS variables, so light and dark (including
+// prefers-color-scheme) restyle the chart without a redraw.
+function exuChart(id, aria, xName, xLabels, yName, yMin, yMax, yDigits, yTicks, series) {
+  const W = 300, H = 128;
+  const left = yDigits >= 3 ? 52 : 34;
+  const right = 10, top = 22, bottom = 28;
+  const plotB = H - bottom;
+  const iw = W - left - right;
+  const ih = plotB - top;
+  const xAt = (i) => left + (xLabels.length <= 1 ? iw / 2 : (i / (xLabels.length - 1)) * iw);
+  const yAt = (v) => plotB - ((v - yMin) / (yMax - yMin)) * ih;
+  const ticks = [];
+  for (let i = 0; i < yTicks; i++) ticks.push(yMin + (yMax - yMin) * (i / (yTicks - 1)));
+  const grid = ticks.map((v) => {
+    const y = yAt(v).toFixed(1);
+    return `<line class="exu-grid" x1="${left}" y1="${y}" x2="${W - right}" y2="${y}"></line><text x="${left - 4}" y="${y}" text-anchor="end" dominant-baseline="middle">${exuFmt(v, yDigits)}</text>`;
+  }).join("");
+  const xText = xLabels.map((lab, i) => `<text x="${xAt(i).toFixed(1)}" y="${plotB + 12}" text-anchor="middle">${exuEsc(lab)}</text>`).join("");
+  const lines = series.map((s) => {
+    let d = "", pen = false;
+    s.values.forEach((v, i) => {
+      if (v == null || !Number.isFinite(v)) { pen = false; return; }
+      d += `${pen ? "L" : "M"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`;
+      pen = true;
+    });
+    if (!d) return "";
+    const dash = s.dash ? "stroke-dasharray:4 3;" : "";
+    return `<path d="${d}" style="fill:none;stroke:${s.color};stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;${dash}"></path>`;
+  }).join("");
+  const dots = series.map((s) => s.values.map((v, i) => {
+    if (v == null || !Number.isFinite(v)) return "";
+    const kind = s.dash ? "paper" : "twin (simulated) · out-of-sample";
+    return `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(v).toFixed(1)}" r="2.2" style="fill:${s.color};stroke:var(--panel);stroke-width:1;vector-effect:non-scaling-stroke"><title>${exuEsc(s.name)} ${exuEsc(xLabels[i])}: ${exuFmt(v, 3)} · ${kind}</title></circle>`;
+  }).join("")).join("");
+  return `<svg id="${id}" class="exu-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${exuEsc(aria)}">
+    <text x="${W - right}" y="12" text-anchor="end" style="fill:var(--ink);font-weight:600">${exuEsc(yName)}</text>
+    ${grid}
+    <line class="exu-axis" x1="${left}" y1="${top}" x2="${left}" y2="${plotB}"></line>
+    <line class="exu-axis" x1="${left}" y1="${plotB}" x2="${W - right}" y2="${plotB}"></line>
+    ${lines}${dots}${xText}
+    <text x="${(left + W - right) / 2}" y="${H - 3}" text-anchor="middle" style="fill:var(--ink);font-weight:600">${exuEsc(xName)}</text>
+  </svg>`;
+}
+
+function exuQSeries(summary) {
+  const xs = [2, 3, 4, 5, 6];
+  const qOf = (id) => xs.map((s) => {
+    const bin = summary[id] && summary[id].qByS0 && summary[id].qByS0[s];
+    return bin && bin.n && bin.q != null ? bin.q : null;
+  });
+  return [
+    { name: "Ideal", color: "var(--faint)", dash: true, values: xs.map((s) => PAPER.qByS0[s].ideal) },
+    { name: "ActivAsk paper", color: "var(--accent)", dash: true, values: xs.map((s) => PAPER.qByS0[s].activask) },
+    { name: "firstQ", color: EXU_COLOR.firstQ, dash: false, values: qOf("firstQ") },
+    { name: "randomQ", color: EXU_COLOR.randomQ, dash: false, values: qOf("randomQ") },
+    { name: "vlmQ", color: EXU_COLOR.vlmQ, dash: false, values: qOf("vlmQ") },
+    { name: "ActivAsk", color: EXU_COLOR.activask, dash: false, values: qOf("activask") },
+  ];
+}
+
+function exuEpsSeries(sweep) {
+  const ids = ["firstQ", "randomQ", "vlmQ", "activask"];
+  const series = [];
+  for (const id of ids) {
+    const rows = (sweep.byPolicy && sweep.byPolicy[id]) || [];
+    series.push({ name: `${id} paper`, color: EXU_COLOR[id], dash: true, values: PAPER.noise[id].slice() });
+    series.push({ name: id, color: EXU_COLOR[id], dash: false, values: rows.map((r) => r.acc) });
+  }
+  return series;
+}
+
+function exuKSeries(sweep) {
+  return [
+    { name: "Ambiguous paper", color: "var(--bad)", dash: true, values: PAPER.kSweep.ambMinG.slice() },
+    { name: "Ambiguous", color: "var(--bad)", dash: false, values: sweep.ambiguous.slice() },
+    { name: "Partial paper", color: "var(--press)", dash: true, values: PAPER.kSweep.partMinG.slice() },
+    { name: "Partial", color: "var(--press)", dash: false, values: sweep.partial.slice() },
+  ];
+}
+
+function exuYMaxQ(series) {
+  let hi = 4;
+  for (const s of series) for (const v of s.values) if (v != null && v > hi) hi = v;
+  return Math.ceil(hi * 2) / 2;
+}
+
+function exuYEps(series) {
+  let lo = 50;
+  for (const s of series) for (const v of s.values) if (v != null && v < lo) lo = Math.floor(v / 10) * 10;
+  return Math.max(0, lo);
+}
+
+function exuYK(series) {
+  let lo = Infinity, hi = -Infinity;
+  for (const s of series) for (const v of s.values) {
+    if (v == null || !Number.isFinite(v)) continue;
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  if (!Number.isFinite(lo)) return [-0.7, -0.6];
+  const pad = Math.max(0.004, (hi - lo) * 0.25);
+  return [lo - pad, hi + pad];
+}
+
+function exuCharts(summary, eps, ks, seed) {
+  const qSeries = exuQSeries(summary);
+  const eSeries = exuEpsSeries(eps);
+  const kSeries = exuKSeries(ks);
+  const [kLo, kHi] = exuYK(kSeries);
+  const q = exuChart("exu-chart-q", "Mean questions by initial candidate count. Ideal reference, paper ActivAsk, and the twin clarifying policies. Out-of-sample.", "|S0|", ["2", "3", "4", "5", "6"], "mean Q", 0, exuYMaxQ(qSeries), 0, 5, qSeries);
+  const e = exuChart("exu-chart-eps", "Accuracy against answer noise. Dashed lines are the paper, solid lines are this seed. Out-of-sample.", "ε", ["0", ".05", ".10", ".15", ".20"], "accuracy %", exuYEps(eSeries), 100, 0, 6, eSeries);
+  const k = exuChart("exu-chart-k", "Mean minimum proposal G against the number of proposals, for partial and ambiguous instructions. Out-of-sample.", "K", ["1", "2", "3", "4", "5"], "mean min G", kLo, kHi, 3, 4, kSeries);
+  const eNote = `Out-of-sample. Dashed is the paper. Solid is seed ${seed}. N = ${eps.n}.`;
+  return `<h3 class="sec-h">Questions by |S0| <em>out-of-sample</em></h3><div class="chart">${q}</div>${exuLegend(qSeries)}
+    <h3 class="sec-h">Accuracy vs eps <em>out-of-sample</em></h3><div class="chart">${e}</div>${exuLegend(eSeries)}<p class="small-note">${eNote}</p>
+    <h3 class="sec-h">Minimum G vs K <em>out-of-sample</em></h3><div class="chart">${k}</div>${exuLegend(kSeries)}
+    <p class="small-note">Sweeps use this seed. They stay at K = 4 and slip 0.05. The controls apply to the detail batch.</p>`;
+}
+
+function exuDetailStatus(batch, ms, ctrl) {
+  const row = batch.summary.activask || batch.summary.top || batch.summary[Object.keys(batch.summary)[0]];
+  const nPol = Object.keys(batch.summary).length;
+  const extra = [];
+  if (ctrl.eps !== 0) extra.push(`ε ${ctrl.eps}`);
+  if (ctrl.K !== PARAMS.K) extra.push(`K ${ctrl.K}`);
+  if (Math.abs(ctrl.slip - 0.05) > 1e-9) extra.push(`slip ${ctrl.slip}`);
+  const tail = extra.length ? ` · ${extra.join(" · ")}` : "";
+  const s0 = row ? exuFmt(row.meanS0) : "–";
+  const multi = row ? exuFmt(row.multi) : "–";
+  return `detail · ${batch.set} · seed ${batch.seed} · ${nPol}×${row ? row.n : 0} · ${ms.toFixed(0)} ms · mean |S0| ${s0} calibrated · multi ${multi}% calibrated${tail}`;
+}
+
+function exuPaint() {
+  const { batch, ms, ctrl, eps, ks } = exuLast;
+  $("exu-status").textContent = exuDetailStatus(batch, ms, ctrl);
+  $("exu-head").innerHTML = exuHeadlineBlock(exuHead);
+  $("exu-charts").innerHTML = exuCharts(batch.summary, eps, ks, batch.seed);
+  const detail = batch.set === "online" ? exuOnlineTable(batch.summary) : exuOfflineTable(batch.summary, "detail");
+  $("exu-tables").innerHTML = detail;
+}
+
+function exuFillTwin(summary) {
+  for (const p of POLICIES) {
+    const cell = document.querySelector(`#report [data-twin="${p.id}"]`);
+    const row = summary[p.id];
+    if (!cell || !row) continue;
+    cell.textContent = exuFmt(row.acc);
+    const range = row.accLo != null ? ` · range ${exuFmt(row.accLo)}–${exuFmt(row.accHi)}` : "";
+    cell.title = `Mean of seeds 1–5 ${exuFmt(row.acc)}${range} · out-of-sample · twin (simulated)`;
+  }
+}
+
+function exuCsvCell(v) {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, "\"\"")}"` : s;
+}
+
+function exuCsv(last) {
+  const { batch, ctrl } = last;
+  const head = ["set", "seed", "eps", "K", "slip", "scene", "family", "type", "instruction", "target", "policy", "s0", "questions", "outcome", "resolved", "executed", "grasped", "grasp", "simulated"];
+  const lines = [head.join(",")];
+  for (const t of batch.trials) {
+    const cells = [
+      batch.set, batch.seed, ctrl.eps, ctrl.K, ctrl.slip,
+      t.scene, t.family || "", t.type || "", t.instr, t.target, t.policy,
+      t.S0 ? t.S0.length : 0, t.questions, t.outcome, t.resolved || "",
+      t.executed == null ? "" : t.executed, t.grasped == null ? "" : t.grasped, t.grasp || "",
+      "simulated",
+    ];
+    lines.push(cells.map(exuCsvCell).join(","));
+  }
+  return lines.join("\n");
+}
+
+function exuCopy() {
+  if (!exuLast) return;
+  const text = exuCsv(exuLast);
+  const done = (ok) => { $("exu-status").textContent = ok ? `Copied ${exuLast.batch.trials.length} trial rows · twin (simulated)` : "Copy failed"; };
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-1000px";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    done(ok);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => done(true), fallback);
+  } else fallback();
+}
+
+// Headline is always seeds 1..5 at the paper protocol. It does not follow the controls.
+function exuRunHeadline() {
+  const t0 = performance.now();
+  const batches = EXU_HEAD_SEEDS.map((seed) => runBatch({ set: "offline", seed, eps: 0, K: PARAMS.K, slip: 0.05 }));
+  exuHead = exuAverage(batches);
+  exuHead.ms = performance.now() - t0;
+  exuHead.seeds = EXU_HEAD_SEEDS.slice();
+  exuFillTwin(exuHead.summary);
+}
+
+// One batch at the controls, plus the paper sweeps at that seed. Detail only:
+// an offline or online run does not replace the headline column.
+function exuExecute() {
+  const ctrl = exuControls();
+  const t0 = performance.now();
+  const batch = runBatch({ set: ctrl.set, seed: ctrl.seed, eps: ctrl.eps, K: ctrl.K, slip: ctrl.slip });
+  const eps = epsSweep({ seed: ctrl.seed });
+  const ks = kSweep({ seed: ctrl.seed });
+  const ms = performance.now() - t0;
+  exuLast = { batch, ms, ctrl, eps, ks };
+  exuPaint();
+  $("exu-csv").disabled = false;
+}
+
+function exuPanelCheck() {
+  const nums = [...document.querySelectorAll("#report [data-twin]")].filter((el) => /^\d+(\.\d+)?$/.test(el.textContent.trim()));
+  const charts = ["exu-chart-q", "exu-chart-eps", "exu-chart-k"].map((id) => document.getElementById(id)).filter((el) => el && el.tagName.toLowerCase() === "svg" && el.querySelector("path") && el.querySelector("text"));
+  const ok = nums.length === 7 && charts.length === 3;
+  return { ok, detail: ok ? "7 twin accuracies and 3 charts" : `twin numbers ${nums.length}/7, charts ${charts.length}/3` };
+}
+
+function exuRegisterCheck() {
+  const entry = { name: "experiments panel", run: exuPanelCheck };
+  try {
+    if (typeof CHECKS !== "undefined" && Array.isArray(CHECKS)) {
+      CHECKS.push(entry);
+      return;
+    }
+  } catch (e) { /* CHECKS is not declared on this branch */ }
+  // This branch's 70-loop.js still returns { ok: true } and does not own CHECKS.
+  // Fold the same check into window.pc.checks so shots run it. The lead's loop,
+  // which maps CHECKS itself, skips this branch because the push above returned.
+  const prev = window.pc && window.pc.checks;
+  if (typeof prev !== "function") return;
+  window.pc.checks = () => {
+    const base = prev.call(window.pc) || { ok: true };
+    let mine;
+    try { mine = entry.run(); } catch (e) { mine = { ok: false, detail: String(e && e.message || e) }; }
+    const results = (base.results || []).concat([{ name: entry.name, ok: mine.ok === true, detail: mine.detail }]);
+    return { ok: base.ok !== false && mine.ok === true, results };
+  };
+}
+
+function exuMount() {
+  $("exp").innerHTML = `<style>
+    #exp .exu-ctl { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: flex-end; }
+    #exp .exu-ctl label { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; color: var(--muted); }
+    #exp .exu-ctl input, #exp .exu-ctl select { font: 500 12px var(--mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; width: 68px; }
+    #exp .exu-ctl select { width: 104px; }
+    #exp .btn-row { margin-top: 8px; }
+    #exp button:disabled { opacity: 0.55; cursor: progress; }
+    #exp .sec-h { margin: 9px 0 3px; }
+    #exp .sec-h em { white-space: normal; overflow: visible; text-overflow: clip; }
+    #exp table.exu-metrics { table-layout: fixed; font-size: 10.5px; }
+    #exp col.exu-c-name { width: 22%; }
+    #exp col.exu-c-acc { width: 30%; }
+    #exp table.exu-online col.exu-c-acc { width: 22%; }
+    #exp table.exu-metrics th, #exp table.exu-metrics td { white-space: normal; vertical-align: top; padding: 3px 2px; overflow: hidden; }
+    #exp td.exu-name { white-space: nowrap; font-weight: 500; }
+    #exp tr.exu-twin td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+    #exp .exu-p { display: block; color: var(--muted); white-space: nowrap; }
+    #exp .exu-t { display: block; color: var(--ink); font-weight: 500; white-space: nowrap; }
+    #exp .exu-ci { display: block; color: var(--faint); font-size: 9px; white-space: nowrap; }
+    #exp .exu-tag { display: block; max-width: 100%; font: 7.5px/1.15 var(--mono); font-style: normal; letter-spacing: 0.01em; text-transform: uppercase; color: var(--faint); white-space: normal; overflow-wrap: anywhere; margin-top: 1px; }
+    #exp .exu-cal { color: var(--accent); }
+    #report table.grid { table-layout: fixed; width: 100%; font-size: 10.5px; }
+    #report table.grid th { white-space: normal; line-height: 1.15; overflow: visible; }
+    #report table.grid td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #report table.grid th:first-child, #report table.grid td:first-child { white-space: normal; width: 32%; }
+    #report table.grid th:nth-child(5), #report table.grid td:nth-child(5) { width: 18%; }
+    #report .sec-h { flex-wrap: wrap; }
+    #report .sec-h em { white-space: normal; overflow: visible; text-overflow: clip; }
+    #exp .exu-sim { font: 8px var(--mono); font-style: normal; letter-spacing: 0.03em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--line); border-radius: 3px; padding: 0 2px; margin-left: 3px; vertical-align: 1px; }
+    #exp .exu-leg { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 2px 0 4px; font-size: 10.5px; color: var(--muted); line-height: 1.35; }
+    #exp .exu-leg span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+    #exp .exu-sw { width: 14px; height: 0; border-top-width: 2px; display: inline-block; }
+    #exp .exu-svg { width: 100%; height: auto; display: block; }
+    #exp .exu-svg text { font: 500 9.5px var(--mono); fill: var(--muted); }
+    #exp .exu-grid { stroke: var(--line); stroke-width: 1; }
+    #exp .exu-axis { stroke: var(--faint); stroke-width: 1; }
+    #exp .small-note { margin: 3px 0 0; }
+  </style>
+  <div class="exu-ctl">
+    <label>Set<select id="exu-set"><option value="offline">Offline</option><option value="online">Online</option></select></label>
+    <label>Seed<input id="exu-seed" type="number" min="1" step="1" value="11"></label>
+    <label>ε<input id="exu-eps" type="number" min="0" max="1" step="0.01" value="0"></label>
+    <label>K<input id="exu-k" type="number" min="1" max="5" step="1" value="${PARAMS.K}"></label>
+    <label>Slip<input id="exu-slip" type="number" min="0" max="1" step="0.01" value="0.05"></label>
+  </div>
+  <div class="btn-row">
+    <button class="btn" id="exu-run" type="button">Run batch</button>
+    <button class="btn" id="exu-csv" type="button" disabled>Copy batch CSV</button>
+  </div>
+  <p class="small-note">The controls run one seed. Headline numbers are the mean of seeds 1–5.</p>
+  <p id="exu-status" class="small-note" aria-live="polite">Running seeds 1–5…</p>
+  <div id="exu-head"></div>
+  <div id="exu-charts"></div>
+  <div id="exu-tables"></div>`;
+  $("exu-run").addEventListener("click", () => {
+    const btn = $("exu-run");
+    if (btn.disabled) return;
+    btn.disabled = true;
+    $("exu-status").textContent = "Running the batch…";
+    setTimeout(() => {
+      try { exuExecute(); } catch (e) { $("exu-status").textContent = `Batch failed: ${e && e.message ? e.message : e}`; }
+      btn.disabled = false;
+    }, 0);
+  });
+  $("exu-csv").addEventListener("click", exuCopy);
+}
+
+exuMount();
+queueMicrotask(() => {
+  try {
+    exuRunHeadline();
+    exuExecute();
+  } catch (e) { $("exu-status").textContent = `Batch failed: ${e && e.message ? e.message : e}`; }
+  exuRegisterCheck();
+});
 // ================================================================ playback loop + window.pc (lead-owned)
 // SEGS holds the current trial's Segment list (composed in M7). Modules animate by pushing a ticker
 // (t) => void onto TICKERS; everything on screen is a pure function of t.

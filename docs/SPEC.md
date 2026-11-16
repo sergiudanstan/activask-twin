@@ -39,7 +39,7 @@ Scene   { id, set:"offline"|"online", family:"cups"|"bottles"|"utensils"|"mixed"
 Instr   { text, type:"clear"|"partial"|"ambiguous", noun, mods:{color?,size?,material?,handle?,lid?}, matches:[obj ids] }
 Cand    { id:"c2", disp:2, obj:"o3", label:"cup", score:0.61, box:[u0,v0,u1,v1] }
 Prop    { text, yes:[cand ids], no:[cand ids], key, count:{total,yes,no}, valid:{exhaustive,disjoint,legal,wording}, G, vlmPick }
-Round   { S:[cand ids], props:[Prop], sel, answer:"yes"|"no" }
+Round   { S:[cand ids], props:[Prop], sel:Prop (the selected proposal object, one of props), answer:"yes"|"no" }
 Trial   { scene, instr, target, policy, eps, S0, rounds:[Round], resolved, outcome:"correct"|"wrong"|"unresolved"|"none", questions }
 Segment { t0, t1, kind, label, q0, q1 }
 ```
@@ -105,6 +105,11 @@ per policy (19 per type), the four online policies, grasp stage included. Per tr
 type from the scene pool, then draw the intended target uniformly among its `matches` (Sec. 4.1 protocol).
 Report accuracy (Wilson 95 % CI), asked rate, mean Q (all and asked), questions vs |S0| beside the ideal
 reference, the ε sweep, and online target / grasp / full-task rates, each beside `PAPER`.
+**Calibrated vs out-of-sample.** The detector score bands are fitted so that mean |S0|, the multi-candidate rate
+and the clarifying policies' asked rate by type match the paper; the UI labels those rows *calibrated* (agreement
+there is by construction). Every other twin number is *out-of-sample*. The batch is paired (all policies see the
+same scene, instruction, target and layout), so the clarifying policies have identical accuracy and asked rate by
+construction; only their question counts can differ. Headline twin numbers are means over several seeds.
 
 ## 5. Scenes (`11-scenes.js`, Sec. 4.1)
 Families: cups-only (6 cups), bottles-only (4 offline, 3 online), utensils (offline: 3 × four forks,
