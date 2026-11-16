@@ -79,6 +79,34 @@ export default function (L, check) {
   const messy = L.proposeQuestions(S0, cands, scene, [], { K: 4, seed: 5, slip: 1 });
   check(messy.every((p) => p.valid.exhaustive && p.valid.disjoint && p.valid.legal && p.valid.wording), "every slipped proposal is repaired or replaced");
 
+  const flagKeys = ["exhaustive", "disjoint", "legal", "wording"];
+  const sameFlags = (a, b) => !!a && !!b && flagKeys.every((k) => a[k] === b[k]);
+  const allTrue = (v) => sameFlags(v, { exhaustive: true, disjoint: true, legal: true, wording: true });
+  const anyFalse = (v) => !!v && flagKeys.some((k) => !v[k]);
+  let slip0n = 0, slip0bad = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const props = L.proposeQuestions(S0, cands, scene, [], { K: 4, seed, slip: 0 });
+    for (const p of props) {
+      slip0n++;
+      if (!sameFlags(p.raw, p.valid) || p.raw === p.valid || p.repaired || p.fallback || !allTrue(p.valid)) slip0bad++;
+    }
+  }
+  check(slip0n > 0 && slip0bad === 0, "slip 0: raw equals valid on every proposal, and nothing is repaired or a fallback");
+  let slipN = 0, slipBad = 0, sawFail = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const props = L.proposeQuestions(S0, cands, scene, [], { K: 4, seed, slip: 0.3 });
+    for (const p of props) {
+      slipN++;
+      if (!allTrue(p.valid)) slipBad++;
+      if (anyFalse(p.raw)) {
+        sawFail++;
+        if (!p.repaired && !p.fallback) slipBad++;
+        if (p.repaired && p.fallback) slipBad++;
+      } else if (p.repaired || p.fallback) slipBad++;
+    }
+  }
+  check(slipN > 0 && slipBad === 0 && sawFail > 0, "slip 0.3: some raw flags are false while valid is all true (" + sawFail + " of " + slipN + ")");
+
   function drive(policy, target, seed0) {
     let S = S0.slice();
     const hist = [];
@@ -164,4 +192,5 @@ export const perturbations = [
   { name: "natural log replaced by log2", find: "py * Math.log(py)", replace: "py * Math.log2(py)" },
   { name: "argmin G replaced by argmax", find: "if (p.G < best.G) best = p;", replace: "if (p.G > best.G) best = p;" },
   { name: "yes and no branches swapped", find: "answer === \"yes\" ? p.yes : p.no", replace: "answer === \"yes\" ? p.no : p.yes" },
+  { name: "raw flags copied from valid", find: "prop.raw = { exhaustive: flags.exhaustive, disjoint: flags.disjoint, legal: flags.legal, wording: flags.wording };", replace: "prop.raw = { exhaustive: prop.valid.exhaustive, disjoint: prop.valid.disjoint, legal: prop.valid.legal, wording: prop.valid.wording };" },
 ];
