@@ -611,7 +611,7 @@ function camProject(p) {
 // Cand    { id:"c2", disp:2, obj:"o3", label:"cup", score:0.61, box:[u0,v0,u1,v1] }      box in CAM pixels
 // Prop    { text, yes:["c1",...], no:[...], key:"handle=true", count:{total,yes,no},
 //           valid:{exhaustive,disjoint,legal,wording}, G, vlmPick:false }
-// Round   { S:[cand ids], props:[Prop], sel, answer:"yes"|"no" }
+// Round   { S:[cand ids], props:[Prop], sel: the selected Prop object, answer:"yes"|"no" }
 // Trial   { scene, instr, target, policy, eps, S0:[cand ids], rounds:[Round], resolved:cand id|null,
 //           outcome:"correct"|"wrong"|"unresolved"|"none", questions }
 // Segment { t0, t1, kind, label, q0, q1 }   one robot motion or dialogue step on the timeline (q = joint dict)

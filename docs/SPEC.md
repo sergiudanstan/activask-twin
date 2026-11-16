@@ -39,7 +39,7 @@ Scene   { id, set:"offline"|"online", family:"cups"|"bottles"|"utensils"|"mixed"
 Instr   { text, type:"clear"|"partial"|"ambiguous", noun, mods:{color?,size?,material?,handle?,lid?}, matches:[obj ids] }
 Cand    { id:"c2", disp:2, obj:"o3", label:"cup", score:0.61, box:[u0,v0,u1,v1] }
 Prop    { text, yes:[cand ids], no:[cand ids], key, count:{total,yes,no}, valid:{exhaustive,disjoint,legal,wording}, G, vlmPick }
-Round   { S:[cand ids], props:[Prop], sel, answer:"yes"|"no" }
+Round   { S:[cand ids], props:[Prop], sel:Prop (the selected proposal object, one of props), answer:"yes"|"no" }
 Trial   { scene, instr, target, policy, eps, S0, rounds:[Round], resolved, outcome:"correct"|"wrong"|"unresolved"|"none", questions }
 Segment { t0, t1, kind, label, q0, q1 }
 ```
