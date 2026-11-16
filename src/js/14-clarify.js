@@ -287,7 +287,10 @@ function clSlip(p, S, r) {
   return { text: "Is it " + (S[0] || "c1") + "?", key: p.key, yes: p.yes.slice(), no: p.no.slice() };
 }
 
-// K proposals drawn with rng. history is a list of keys already asked; those partitions are not offered again.
+// K proposals drawn with rng. history lists the keys AND texts already asked: an asked partition is not offered
+// again, and a new partition whose wording was already used (two split points both read "Is it on the near
+// side?") is reworded relative to the remaining candidates ("Of the ones left, ..."), so the dialogue never
+// repeats a question (Sec. 3.4.1: dialogue history avoids repeating answered questions).
 // slip (default 0 here; runTrial defaults to 0.05) drops a candidate, duplicates one, or leaks an id, then repairs.
 function proposeQuestions(S, cands, scene, history, opts) {
   const opt = opts || {};
@@ -308,6 +311,9 @@ function proposeQuestions(S, cands, scene, history, opts) {
     if (clFlagsOk(flags)) built.push(clAnnotate(damaged, S, scene));
     else built.push(repairProp(damaged, S, cands, scene) || fallbackProp(S, cands, scene));
   }
+  for (const p of built) if (hist.has(p.text)) p.text = "Of the ones left, " + p.text.charAt(0).toLowerCase() + p.text.slice(1);
+  const fresh = built.filter((p) => !hist.has(p.text));
+  built.length = 0; built.push(...fresh);
   built.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const pref = clVlmPreferred(built);
   for (const p of built) p.vlmPick = p === pref;
@@ -458,7 +464,7 @@ function runTrial(scene, instr, targetObjId, policy, opts) {
     if (!sel) break;
     const answer = operatorAnswer(sel, targetObj, eps, noise);
     rounds.push({ S: S.slice(), props, sel, answer });
-    history.push(sel.key);
+    history.push(sel.key, sel.text);
     S = updateState(S, sel, answer);
   }
   const resolved = S.length === 1 ? S[0] : null;
