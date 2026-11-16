@@ -153,8 +153,8 @@
   .verdict.fail { background: var(--bad-soft); color: var(--bad); }
   .verdict.busy { background: var(--panel-2); color: var(--muted); }
   /* camera views: two compact rows, each button shows its key */
-  .toolbar { top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-  .views { display: grid; grid-template-columns: repeat(6, auto); gap: 1px; padding: 3px; }
+  .toolbar { top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100% - 20px); }
+  .views { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 1px; padding: 3px; max-width: 560px; }
   .views button { display: flex; align-items: baseline; justify-content: space-between; gap: 5px; border: 0; background: none; cursor: pointer; padding: 3px 6px 3px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
   .views button kbd { font: 500 9px var(--mono); color: var(--faint); }
   .views button:hover { color: var(--ink); background: var(--panel-2); }
@@ -397,6 +397,41 @@ table.grid tr.sel td { background: var(--accent-soft); }
 .tag-sim { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
 .camwrap { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
 .camwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.setup { margin: 0 0 4px; }
+.range { display: flex; align-items: center; gap: 8px; }
+.range input[type="range"] { flex: 1; margin: 0; }
+.range output { flex: none; min-width: 34px; text-align: right; font: 500 12px var(--mono); }
+.field input[type="number"] { width: 100%; font: 500 12.5px var(--mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.cand-row { display: flex; flex-wrap: wrap; gap: 4px; min-height: 26px; }
+.cand { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 3px; border-radius: 999px; background: var(--panel-2); font: 500 12px var(--ui); }
+.cand i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); }
+.cand b { font: 600 11px var(--mono); }
+.cand.dead { opacity: 0.42; text-decoration: line-through; }
+.cand.hot { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.prop-wrap { overflow-x: auto; margin: 0 -2px 2px; }
+#ui-props { table-layout: fixed; width: 100%; font: 10.5px var(--mono); }
+#ui-props th, #ui-props td { padding: 2px 2px; }
+#ui-props th:nth-child(2), #ui-props td:nth-child(2),
+#ui-props th:nth-child(3), #ui-props td:nth-child(3) { width: 18px; }
+#ui-props th:nth-child(4), #ui-props td:nth-child(4),
+#ui-props th:nth-child(5), #ui-props td:nth-child(5) { width: 40px; }
+#ui-props th:nth-child(6), #ui-props td:nth-child(6) { width: 46px; }
+#ui-props th:nth-child(7), #ui-props td:nth-child(7) { width: 52px; }
+table.grid td.q { white-space: normal; }
+.flag { display: inline-block; margin-right: 1px; padding: 0 2px; border-radius: 3px; font: 600 8px var(--mono); letter-spacing: 0; }
+.flag.on { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.flag.off { background: var(--bad-soft); color: var(--bad); }
+.star { color: var(--accent); }
+.hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hist li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.hist b { font: 600 11px var(--mono); text-transform: uppercase; color: var(--muted); }
+.outcome { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); font-size: 13px; }
+.outcome.correct { background: color-mix(in srgb, var(--good) 16%, transparent); }
+.outcome.wrong, .outcome.unresolved { background: var(--bad-soft); }
+.stat .value.sm { font-size: 13px; }
+#ui-yes { background: var(--tray-soft); }
+#ui-no { background: var(--reject-soft); }
+#app-speech-lab { margin: 4px 0 0; }
 </style>
 </head>
 <body>
@@ -434,7 +469,33 @@ table.grid tr.sel td { background: var(--accent-soft); }
     </div>
     <div class="card" id="clarify-card">
       <h2>Clarify <span>candidate state · yes/no · EFE</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
-      <div id="clarify"></div>
+      <div id="clarify">
+        <form id="app-form" class="setup" autocomplete="off">
+          <div class="field"><label for="app-set">Set</label><select id="app-set"><option value="offline">offline</option><option value="online">online</option></select></div>
+          <div class="field"><label for="app-scene">Scene</label><select id="app-scene"></select></div>
+          <div class="field"><label for="app-instr">Instruction</label><select id="app-instr"></select></div>
+          <div class="field"><label for="app-policy">Policy</label><select id="app-policy"></select></div>
+          <div class="field"><label for="app-eps">ε</label><span class="range"><input id="app-eps" type="range" min="0" max="0.2" step="0.01" value="0"><output id="app-eps-out" for="app-eps">0.00</output></span></div>
+          <div class="field"><label for="app-k">K</label><span class="range"><input id="app-k" type="range" min="1" max="5" step="1" value="4"><output id="app-k-out" for="app-k">4</output></span></div>
+          <div class="field"><label for="app-seed">Seed</label><input id="app-seed" type="number" min="1" step="1" value="1"></div>
+          <div class="btn-row"><button class="btn" id="app-new" type="button">New trial</button></div>
+          <label class="toggle" id="app-speech-lab"><input id="app-speech" type="checkbox"> Speak the question</label>
+          <p class="small-note" id="app-target-note"></p>
+        </form>
+        <div id="ui-say" class="say" hidden></div>
+        <div class="answer" id="ui-answer" hidden>
+          <button class="btn" id="ui-yes" type="button">Yes <kbd>Y</kbd></button>
+          <button class="btn" id="ui-no" type="button">No <kbd>N</kbd></button>
+        </div>
+        <h3 class="sec-h">State <em>S<sub>t</sub></em></h3>
+        <div id="ui-cands" class="cand-row"></div>
+        <h3 class="sec-h">Proposals <em id="ui-round"></em></h3>
+        <div class="prop-wrap"><table class="grid" id="ui-props"></table></div>
+        <p class="small-note">G = p<sub>yes</sub> ln p<sub>yes</sub> + p<sub>no</sub> ln p<sub>no</sub></p>
+        <h3 class="sec-h">Dialogue</h3>
+        <ol id="ui-hist" class="hist"></ol>
+        <div id="ui-outcome" class="outcome" hidden></div>
+      </div>
     </div>
     <div class="card" id="camera-card">
       <h2>Head camera <span>D435i colour · candidates</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
@@ -447,7 +508,7 @@ table.grid tr.sel td { background: var(--accent-soft); }
     </div>
     <div class="card" id="exp-card">
       <h2>Experiments <span>seeded batch · simulated</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
-      <div id="exp"></div>
+      <div id="exp"><p class="small-note">The batch report is filled when the experiments module is loaded.</p></div>
     </div>
     <div class="card" id="report-card">
       <h2>Paper vs twin <span>Robotics 15(8):154</span><button class="close" type="button" aria-label="Close panel">×</button></h2>
@@ -466,7 +527,7 @@ table.grid tr.sel td { background: var(--accent-soft); }
         <div class="views glass" role="group" aria-label="Camera views" id="views"></div>
       </div>
       <div class="overlay hint glass" id="hint">
-        <span><kbd>Space</kbd> play</span><span><kbd>1</kbd>–<kbd>6</kbd> views</span>
+        <span><kbd>Space</kbd> play</span><span><kbd>1</kbd>–<kbd>7</kbd> views</span><span><kbd>Y</kbd>/<kbd>N</kbd> answer</span>
         <span class="mouse">drag rotate · right-drag pan · wheel zoom</span>
       </div>
       <div class="load-error" id="load-error">The 3D view loads three.js from a CDN and needs an internet connection.<br>Reconnect and reload the page.</div>
