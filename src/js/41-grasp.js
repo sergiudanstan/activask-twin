@@ -1,9 +1,12 @@
 // ================================================================ grasp animation
 // graspTicker(segs, objGroup, ok, releaseAt) poses the robot with setStretch and carries objGroup from
-// the end of close. ok === false opens the gripper, then drops the object straight down onto the table
-// under the grasp point, and only then retracts. releaseAt, when set, puts the object back on its table
-// pose at that time (the demo's next grasp). Omit it and a successful grasp stays in the hand (paper:
-// grasp, lift, and retain). The tick allocates nothing.
+// the end of close. The trial UI passes the whole timeline: dialogue segments (listen, perceive, ask,
+// answer, resolved) come first and have no q0/q1, then the grasp segments with absolute times.
+// Segments without q0/q1 are skipped. Before the first posed segment the robot holds that segment's
+// q0; after the last it holds that segment's q1. ok === false opens the gripper, then drops the object
+// straight down onto the table under the grasp point, and only then retracts. releaseAt, when set,
+// puts the object back on its table pose at that time (the demo's next grasp). Omit it and a successful
+// grasp stays in the hand (paper: grasp, lift, and retain). The tick allocates nothing.
 const graspChkV = new THREE.Vector3();
 const graspFkBuf = { p: [0, 0, 0], close: [0, 0, 0] };
 const graspKeys = ["x", "lift", "arm", "yaw", "pitch", "roll", "grip", "pan", "tilt"];
@@ -12,19 +15,22 @@ const graspDropDur = 0.35;
 
 function graspTicker(segs, objGroup, ok, releaseAt) {
   const q = { x: 0, lift: 0, arm: 0, yaw: 0, pitch: 0, roll: 0, grip: 0, pan: 0, tilt: 0 };
-  const home = {
+  const home = objGroup ? {
     x: objGroup.position.x, y: objGroup.position.y, z: objGroup.position.z, yaw: objGroup.rotation.z,
-  };
+  } : null;
   let close = null, lift = null, retract = null;
+  let first = null, last = null;
   for (let i = 0; i < segs.length; i++) {
-    if (segs[i].kind === "close") close = segs[i];
-    if (segs[i].kind === "lift") lift = segs[i];
-    if (segs[i].kind === "retract") retract = segs[i];
+    const s = segs[i];
+    if (s.kind === "close") close = s;
+    if (s.kind === "lift") lift = s;
+    if (s.kind === "retract") retract = s;
+    if (s.q0 && s.q1) { if (!first) first = s; last = s; }
   }
   const off = [0, 0, 0];
-  const lifted = [home.x, home.y, home.z];
-  const parked = [home.x, home.y, home.z];
-  if (close) {
+  const lifted = home ? [home.x, home.y, home.z] : [0, 0, 0];
+  const parked = home ? [home.x, home.y, home.z] : [0, 0, 0];
+  if (close && home) {
     kinFK(close.q1, graspFkBuf);
     off[0] = home.x - graspFkBuf.p[0];
     off[1] = home.y - graspFkBuf.p[1];
@@ -69,22 +75,47 @@ function graspTicker(segs, objGroup, ok, releaseAt) {
       setStretch(q);
       posed = true;
     }
-    if (!posed) {
-      for (let i = 0; i < n; i++) {
-        const s = segs[i];
-        if (t >= s.t0 && (t < s.t1 || (i === n - 1 && t <= s.t1 + 1e-9))) seg = s;
-      }
-      if (seg) {
-        const u = seg.t1 <= seg.t0 ? 1 : (t - seg.t0) / (seg.t1 - seg.t0);
-        const k = ease(u);
-        for (let i = 0; i < 9; i++) {
-          const key = graspKeys[i];
-          q[key] = seg.q0[key] + (seg.q1[key] - seg.q0[key]) * k;
+    if (!posed && first) {
+      if (t < first.t0) {
+        // Dialogue (or any q-less prefix) shares this timeline. Do not pose before the timeline
+        // starts: another ticker may own that time (the demo runs one ticker per object).
+        if (n && t >= segs[0].t0) {
+          for (let i = 0; i < 9; i++) q[graspKeys[i]] = first.q0[graspKeys[i]];
+          setStretch(q);
+          posed = true;
         }
+      } else if (t >= last.t1) {
+        for (let i = 0; i < 9; i++) q[graspKeys[i]] = last.q1[graspKeys[i]];
         setStretch(q);
+        posed = true;
+      } else {
+        for (let i = 0; i < n; i++) {
+          const s = segs[i];
+          if (!s.q0 || !s.q1) continue;
+          if (t >= s.t0 && t < s.t1) seg = s;
+        }
+        if (seg) {
+          const u = seg.t1 <= seg.t0 ? 1 : (t - seg.t0) / (seg.t1 - seg.t0);
+          const k = ease(u);
+          for (let i = 0; i < 9; i++) {
+            const key = graspKeys[i];
+            q[key] = seg.q0[key] + (seg.q1[key] - seg.q0[key]) * k;
+          }
+          setStretch(q);
+          posed = true;
+        } else {
+          let hold = first.q0;
+          for (let i = 0; i < n; i++) {
+            const s = segs[i];
+            if (s.q0 && s.q1 && s.t1 <= t) hold = s.q1;
+          }
+          for (let i = 0; i < 9; i++) q[graspKeys[i]] = hold[graspKeys[i]];
+          setStretch(q);
+          posed = true;
+        }
       }
     }
-    if (!close) return;
+    if (!close || !home) return;
     objGroup.rotation.z = home.yaw;
     if (haveRelease && t >= releaseAt) {
       objGroup.position.set(home.x, home.y, home.z);
