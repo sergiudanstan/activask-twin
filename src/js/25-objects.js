@@ -46,87 +46,25 @@ function objLathe(prof, material, parent, seg, name) {
 }
 
 function objCup(o, material, parent) {
-  const d = dimsOf(o);
-  const R = d.d / 2;
-  const H = d.h;
-  const wall = Math.max(0.0016, Math.min(0.0026, R * 0.07));
-  const lip = Math.min(0.0032, H * 0.04);
-  objLathe([
-    [0.001, 0],
-    [R * 0.7, 0],
-    [R * 0.95, 0.003],
-    [R, H * 0.16],
-    [R * 0.985, H - lip],
-    [R + lip * 0.4, H],
-    [R - wall, H],
-    [R - wall, wall + 0.0014],
-    [R * 0.5, wall * 0.6],
-    [0.001, wall * 0.5],
-  ], material, parent, 36, o.id + "-body");
+  objLathe(objCupProfile(o), material, parent, 36, o.id + "-body");
   if (o.handle) {
-    const hr = Math.min(0.015, H * 0.18);
-    const z0 = H * 0.36;
-    const z1 = H * 0.76;
-    const h = tubeAlong([
-      [R * 0.9, 0, z0],
-      [R + hr * 0.7, 0, z0 + (z1 - z0) * 0.2],
-      [R + hr * 1.15, 0, (z0 + z1) * 0.5],
-      [R + hr * 0.7, 0, z1 - (z1 - z0) * 0.2],
-      [R * 0.9, 0, z1],
-    ], 0.0034, material, parent, 8, 6);
+    const hnd = objCupHandle(o);
+    const h = tubeAlong(hnd.pts, hnd.r, material, parent, 8, 6);
     h.name = o.id + "-handle";
   }
   if (o.lid) {
-    const z = H + 0.0006;
-    objLathe([
-      [0.001, z],
-      [R * 1.005, z],
-      [R * 1.04, z + 0.0035],
-      [R * 0.7, z + 0.008],
-      [R * 0.46, z + 0.014],
-      [R * 0.14, z + 0.018],
-      [0.001, z + 0.011],
-    ], material, parent, 28, o.id + "-lid");
-    const sip = mesh(new THREE.SphereGeometry(Math.max(0.004, R * 0.16), 10, 8), material, parent);
-    sip.scale.set(1.2, 0.72, 0.55);
-    sip.position.set(R * 0.42, 0, z + 0.020);
+    const lid = objCupLid(o);
+    objLathe(lid.profile, material, parent, 28, o.id + "-lid");
+    const sip = mesh(new THREE.SphereGeometry(lid.sipR, 10, 8), material, parent);
+    sip.scale.set(lid.sipSx, lid.sipSy, lid.sipSz);
+    sip.position.set(lid.sipX, 0, lid.sipZ);
     sip.name = o.id + "-sip";
   }
 }
 
 function objBottle(o, material, parent) {
-  const d = dimsOf(o);
-  const R = d.d / 2;
-  const H = d.h;
-  const neck = Math.max(0.01, R * 0.32);
-  const shoulder = H * 0.66;
-  const neckZ = H * 0.82;
-  const wall = 0.0014;
-  const prof = [
-    [0.001, 0],
-    [R * 0.75, 0],
-    [R, H * 0.05],
-    [R, shoulder],
-    [neck * 1.25, neckZ],
-    [neck, H - 0.002],
-    [neck + 0.0008, H],
-    [neck - wall, H],
-    [neck - wall, neckZ + 0.012],
-    [R - wall, shoulder - 0.004],
-    [R - wall, wall],
-    [0.001, wall * 0.65],
-  ];
-  objLathe(prof, material, parent, 36, o.id + "-body");
-  if (o.lid) {
-    objLathe([
-      [0.001, H - 0.001],
-      [neck * 1.2, H - 0.001],
-      [neck * 1.28, H + 0.003],
-      [neck * 1.28, H + 0.016],
-      [neck * 0.55, H + 0.022],
-      [0.001, H + 0.022],
-    ], material, parent, 24, o.id + "-cap");
-  }
+  objLathe(objBottleProfile(o), material, parent, 36, o.id + "-body");
+  if (o.lid) objLathe(objBottleCapProfile(o), material, parent, 24, o.id + "-cap");
 }
 
 function objShift(geo, x, y, z) {
@@ -135,28 +73,15 @@ function objShift(geo, x, y, z) {
 }
 
 function objFork(o, material, parent) {
-  const d = dimsOf(o);
-  const L = d.l;
-  const W = d.w;
-  const T = d.h;
-  const handleL = L * 0.56;
-  const rr = Math.min(0.0012, T * 0.25);
-  const handleH = T * 0.85;
-  const handle = mesh(new RoundedBoxGeometry(handleL, W * 0.42, handleH, 2, rr), material, parent);
-  handle.position.set(-L / 2 + handleL / 2, 0, handleH / 2);
+  const parts = objForkParts(o);
+  const h = parts.handle;
+  const handle = mesh(new RoundedBoxGeometry(h.l, h.w, h.h, 2, h.r), material, parent);
+  handle.position.set(h.x, h.y, h.z);
   handle.name = o.id + "-handle";
   const boxes = [];
-  const neckL = L * 0.10;
-  const neckX = -L / 2 + handleL + neckL / 2 - L * 0.02;
-  boxes.push(objShift(new THREE.BoxGeometry(neckL, W * 0.88, T * 0.9), neckX, 0, T * 0.48));
-  const tineW = W * 0.15;
-  const span = W * 0.92;
-  const gap = (span - 4 * tineW) / 3;
-  const tineStart = neckX + neckL / 2 - L * 0.015;
-  const tineLen = L / 2 - tineStart;
-  for (let i = 0; i < 4; i++) {
-    const y = -span / 2 + tineW / 2 + i * (tineW + gap);
-    boxes.push(objShift(new THREE.BoxGeometry(tineLen, tineW, T * 0.42), tineStart + tineLen / 2, y, T * 0.26));
+  for (let i = 0; i < parts.boxes.length; i++) {
+    const b = parts.boxes[i];
+    boxes.push(objShift(new THREE.BoxGeometry(b.l, b.w, b.h), b.x, b.y, b.z));
   }
   const merged = BufferGeometryUtils.mergeGeometries(boxes);
   boxes.forEach((g) => g.dispose());
@@ -165,31 +90,14 @@ function objFork(o, material, parent) {
 }
 
 function objSpoon(o, material, parent) {
-  const d = dimsOf(o);
-  const L = d.l;
-  const W = d.w;
-  const T = d.h;
-  const bowlL = L * 0.4;
-  const handleL = L * 0.68;
-  const rr = Math.min(0.0016, T * 0.3);
-  const handleH = T * 0.72;
-  const handle = mesh(new RoundedBoxGeometry(handleL, Math.min(W * 0.38, 0.012), handleH, 2, rr), material, parent);
-  handle.position.set(-L / 2 + handleL / 2, 0, handleH / 2);
+  const parts = objSpoonParts(o);
+  const h = parts.handle;
+  const handle = mesh(new RoundedBoxGeometry(h.l, h.w, h.h, 2, h.r), material, parent);
+  handle.position.set(h.x, h.y, h.z);
   handle.name = o.id + "-handle";
-  const Rb = W / 2;
-  const depth = Math.max(0.006, T * 1.15);
-  const bowl = objLathe([
-    [0.001, 0.0012],
-    [Rb * 0.45, 0.0016],
-    [Rb * 0.82, depth * 0.32],
-    [Rb, depth * 0.78],
-    [Rb * 0.86, depth * 0.96],
-    [Rb * 0.62, depth * 0.42],
-    [Rb * 0.30, depth * 0.22],
-    [0.001, depth * 0.22],
-  ], material, parent, 28, o.id + "-bowl");
-  bowl.scale.set(bowlL / W, 0.92, 1);
-  bowl.position.set(L / 2 - bowlL / 2, 0, 0);
+  const bowl = objLathe(parts.bowl.profile, material, parent, 28, o.id + "-bowl");
+  bowl.scale.set(parts.bowl.sx, parts.bowl.sy, 1);
+  bowl.position.set(parts.bowl.x, 0, 0);
 }
 
 function makeObject(o) {
