@@ -9,7 +9,17 @@ let mode = QS.get("mode") === "interactive" ? "interactive" : "auto";
 // ---- panels (?panels=clarify,camera opens exactly these)
 const openPanels = { auto: new Set(["live-card", "clarify-card"]), interactive: new Set(["clarify-card", "camera-card"]) };
 if (uiNarrow.matches) { openPanels.auto.clear(); openPanels.interactive.clear(); }
-if (QS.has("panels")) openPanels[mode] = new Set(QS.get("panels").split(",").map((k) => `${k.trim().toLowerCase()}-card`).filter((id) => $(id)));
+function uiPanelAllowed(id, m) {
+  const node = $(id);
+  if (!node) return false;
+  const rail = document.querySelector(`.rail-item[data-panel="${id}"]`);
+  if (!rail) return false;
+  return rail.dataset.modes.split(" ").includes(m);
+}
+if (QS.has("panels")) {
+  const ids = QS.get("panels").split(",").map((k) => `${k.trim().toLowerCase()}-card`);
+  for (const m of ["auto", "interactive"]) openPanels[m] = new Set(ids.filter((id) => uiPanelAllowed(id, m)));
+}
 const uiDrawer = $("drawer");
 let uiDrawerOpen = false;
 function syncPanels() {
@@ -31,10 +41,29 @@ document.querySelectorAll(".rail-item").forEach((b) => b.addEventListener("click
 document.querySelectorAll(".card .close").forEach((b) => b.addEventListener("click", () => { openPanels[mode].delete(b.closest(".card").id); syncPanels(); }));
 const panelOpen = (id) => uiDrawerOpen && openPanels[mode].has(id);
 function setMode(m) {
+  const keepClarify = openPanels[mode].has("clarify-card");
   mode = m;
+  if (keepClarify) openPanels[mode].add("clarify-card");
   document.querySelectorAll(".mode-switch button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
   $("now-mode").textContent = m === "auto" ? "AUTO" : "YOU";
   syncPanels();
+  uiSyncEps();
+}
+function uiSyncEps() {
+  const eps = $("app-eps");
+  const note = $("app-eps-note");
+  const off = mode === "interactive";
+  if (eps) eps.disabled = off;
+  if (note) note.hidden = !off;
+}
+const UI_VLM = { directVLM: 1, firstQ: 1, randomQ: 1, vlmQ: 1 };
+function uiPolicyLabel(p) {
+  if (!p) return "–";
+  return UI_VLM[p.id] ? p.label + " (sim.)" : p.label;
+}
+function uiPolicyRule(p) {
+  if (!p) return "";
+  return UI_VLM[p.id] ? p.rule + " Simulated." : p.rule;
 }
 document.querySelectorAll(".mode-switch button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
@@ -57,17 +86,18 @@ function uiSetNow(lane, label, cmd = "") {
 function renderPaperTable() {
   const rows = POLICIES.map((p) => {
     const o = PAPER.offline[p.id];
-    return `<tr><td>${p.label}</td><td>${fmt(o.acc)}</td><td>${fmt(o.asked)}</td><td>${o.qAsked == null ? "–" : fmt(o.qAsked)}</td><td data-twin="${p.id}">–</td></tr>`;
+    return `<tr><td>${uiPolicyLabel(p)}</td><td>${fmt(o.acc)}</td><td>${fmt(o.asked)}</td><td>${o.qAsked == null ? "–" : fmt(o.qAsked)}</td><td data-twin="${p.id}">–</td></tr>`;
   }).join("");
   $("report").innerHTML = `<h3 class="sec-h">Offline target resolution <em>paper: 216 trials per method</em></h3>
-    <table class="grid"><thead><tr><th>Policy</th><th>Acc %</th><th>Asked %</th><th>Q / asked</th><th>Twin acc %<span class="tag-sim">sim</span></th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="grid"><thead><tr><th>Policy</th><th>Acc %</th><th>Asked %</th><th>Q / asked</th><th>Twin acc % (sim, mean of seeds 1–5)</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="small-note">Paper: ${PAPER.ref} Twin numbers are simulated (rule-based questions, simulated perception) and are never the paper's results.</p>`;
 }
 renderPaperTable();
 
-const uiKindShort = { perceive: "see", resolved: "ok", unresolved: "stop", pregrasp: "pre", reobserve: "look" };
+const uiKindShort = { listen: "in", perceive: "see", answer: "yn", resolved: "ok", unresolved: "stop", grasp: "grip", pregrasp: "pre", descend: "down", close: "shut", lift: "up", retract: "back", reobserve: "look" };
+const uiKindTiny = { listen: "L", perceive: "S", ask: "Q", answer: "A", resolved: "R", unresolved: "X", grasp: "G", pregrasp: "P", descend: "D", close: "C", lift: "U", retract: "B", reobserve: "O" };
 const uiKindHex = {
-  listen: "#a8620c", perceive: "#7a4fc0", ask: "#0b8484", answer: "#2a8a3e",
+  listen: "#a8620c", perceive: "#7a4fc0", ask: "#0b8484", answer: "#e0922a",
   resolved: "#2a8a3e", unresolved: "#c8312b", grasp: "#3550c8", pregrasp: "#3550c8",
   descend: "#8a6d1f", close: "#c4531a", lift: "#0b8484", retract: "#5f6670", reobserve: "#7a4fc0",
 };
@@ -83,12 +113,19 @@ function uiCell(v) {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, "\"\"")}"` : s;
 }
 function uiCsv() {
-  const head = ["scene", "instruction", "type", "policy", "eps", "K", "S0", "questions", "outcome", "resolved", "target"];
+  const head = ["scene", "instruction", "type", "policy", "eps", "K", "seed", "mode", "S0", "questions", "outcome", "resolved", "target"];
   const lines = [head.join(",")];
   for (const row of appLog) {
-    lines.push([row.scene, row.instruction, row.type, row.policy, row.eps, row.K, row.S0, row.questions, row.outcome, row.resolved, row.target].map(uiCell).join(","));
+    lines.push([row.scene, row.instruction, row.type, row.policy, row.eps, row.K, row.seed, row.mode, row.S0, row.questions, row.outcome, row.resolved, row.target].map(uiCell).join(","));
   }
   return lines.join("\n");
+}
+function uiOutcomeLine(shown) {
+  if (shown.outcome === "none" && mode === "interactive") {
+    const line = "resolved; no hidden target was set (click an object before answering to score the trial)";
+    return shown.belief ? line + " · " + shown.belief : line;
+  }
+  return shown.belief ? shown.outcome + " · " + shown.belief : shown.outcome;
 }
 function uiPaint() {
   const shown = appShown || {};
@@ -116,14 +153,17 @@ function uiPaint() {
       const py = n ? p.count.yes / n : 0;
       const pn = n ? p.count.no / n : 0;
       const on = !!(sel && (p === sel || p.key === sel.key));
-      const flags = p.valid || {};
+      const flags = p.raw || p.valid || {};
       const flag = (ok, name, title) => `<span class="flag ${ok ? "on" : "off"}" title="${title}">${name}</span>`;
-      rows += `<tr class="${on ? "sel" : ""}"><td class="q">${on ? `<span class="star">★</span> ` : ""}${uiEsc(p.text)}</td>`
+      const badge = p.fallback
+        ? ` <span class="flag repair" title="fallback partition; the key is only a label">fallback</span>`
+        : (p.repaired ? ` <span class="flag repair" title="repaired after a validity check failed">repaired</span>` : "");
+      rows += `<tr class="${on ? "sel" : ""}"><td class="q">${on ? `<span class="star">★</span> ` : ""}${uiEsc(p.text)}${badge}</td>`
         + `<td>${p.count ? p.count.yes : "–"}</td><td>${p.count ? p.count.no : "–"}</td>`
         + `<td>${n ? py.toFixed(3) : "–"}</td><td>${n ? pn.toFixed(3) : "–"}</td><td>${fmt(p.G, 3)}</td>`
         + `<td class="flags">${flag(flags.exhaustive, "E", "exhaustive")}${flag(flags.disjoint, "D", "disjoint")}${flag(flags.legal, "L", "legal")}${flag(flags.wording, "W", "wording")}</td></tr>`;
     }
-    table.innerHTML = `<thead><tr><th>Question</th><th title="yes branch">Y</th><th title="no branch">N</th><th title="p yes">p<sub>y</sub></th><th title="p no">p<sub>n</sub></th><th>G</th><th title="exhaustive, disjoint, legal, wording">Valid</th></tr></thead><tbody>${rows || `<tr><td class="q">No proposal this round.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`}</tbody>`;
+    table.innerHTML = `<thead><tr><th>Question</th><th title="yes branch">Y</th><th title="no branch">N</th><th title="p yes">p<sub>y</sub></th><th title="p no">p<sub>n</sub></th><th>G</th><th title="exhaustive, disjoint, legal, wording, before repair">Raw</th></tr></thead><tbody>${rows || `<tr><td class="q">No proposal this round.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`}</tbody>`;
   }
   const hist = $("ui-hist");
   if (hist) {
@@ -136,18 +176,21 @@ function uiPaint() {
   if (say) {
     const asking = (shown.phase === "ask" || shown.phase === "answer") && shown.sel;
     say.hidden = false;
+    const polNow = POLICIES.find((p) => p.id === appPolicy);
     if (asking) say.innerHTML = `<small>robot asks</small>${uiEsc(shown.sel.text)}`;
-    else if (appInstr) say.innerHTML = `<small>${uiEsc(appInstr.type)} · ${uiEsc(appPolicy)}</small>${uiEsc(appInstr.text)}`;
+    else if (appInstr) say.innerHTML = `<small>${uiEsc(appInstr.type)} · ${uiEsc(polNow ? uiPolicyLabel(polNow) : appPolicy)}</small>${uiEsc(appInstr.text)}`;
     else say.hidden = true;
   }
   const answers = $("ui-answer");
   if (answers) answers.hidden = !(mode === "interactive" && shown.pending);
+  const yn = $("ui-yn");
+  if (yn) yn.hidden = !(mode === "interactive" && shown.pending && uiNarrow.matches);
   const out = $("ui-outcome");
   if (out) {
     if (shown.outcome) {
       out.hidden = false;
       out.className = "outcome " + shown.outcome;
-      out.textContent = shown.belief ? `${shown.outcome} · ${shown.belief}` : shown.outcome;
+      out.textContent = uiOutcomeLine(shown);
     } else {
       out.hidden = true;
       out.textContent = "";
@@ -159,6 +202,12 @@ function uiPaint() {
       ? (appTargetChosen ? "Hidden target set." : "Click an object to set the hidden target.")
       : "Hidden target: drawn from the instruction's matches.";
   }
+  const polNote = $("app-policy-note");
+  if (polNote) {
+    const info = POLICIES.find((p) => p.id === appPolicy);
+    polNote.hidden = !(info && !info.clarifies);
+  }
+  uiSyncEps();
   uiPaintLive();
   uiPaintCam();
   uiPaintGrasp();
@@ -170,12 +219,13 @@ function uiPaintLive() {
   const pol = POLICIES.find((p) => p.id === appPolicy);
   const outcome = (appShown && appShown.outcome) || "in progress";
   const questions = appShown ? appShown.questions : 0;
+  const epsLine = mode === "interactive" ? "ε not applied · seed " + appSeed : "ε " + Number(appEps).toFixed(2) + " · seed " + appSeed;
   host.innerHTML = `<div class="stat"><small>Scene</small><div class="value sm">${uiEsc(appSceneId || "–")}</div><div class="sub">${uiEsc(appPlaced ? appPlaced.family : "")} · ${uiEsc(appSet || "")}</div></div>`
     + `<div class="stat"><small>Instruction</small><div class="value sm">${uiEsc(ins ? ins.type : "–")}</div><div class="sub">|S0| = ${appCands.length}</div></div>`
-    + `<div class="stat"><small>Questions</small><div class="value">${questions}</div><div class="sub">${uiEsc(outcome)}</div></div>`
-    + `<div class="stat"><small>Policy</small><div class="value sm">${uiEsc(pol ? pol.label : appPolicy || "–")}</div><div class="sub">${uiEsc(pol ? pol.rule : "")}</div></div>`
+    + `<div class="stat"><small>Questions</small><div class="value">${questions}</div><div class="sub">${uiEsc(outcome === "none" && mode === "interactive" ? "no target set" : outcome)}</div></div>`
+    + `<div class="stat"><small>Policy</small><div class="value sm">${uiEsc(pol ? uiPolicyLabel(pol) : appPolicy || "–")}</div><div class="sub">${uiEsc(pol ? uiPolicyRule(pol) : "")}</div></div>`
     + `<div class="stat"><small>τ</small><div class="value">${PARAMS.tau}</div><div class="sub">text ${PARAMS.textThr} · NMS ${PARAMS.nmsIoU}</div></div>`
-    + `<div class="stat"><small>K</small><div class="value">${appK}</div><div class="sub">ε ${Number(appEps).toFixed(2)} · seed ${appSeed}</div></div>`;
+    + `<div class="stat"><small>K</small><div class="value">${appK}</div><div class="sub">${uiEsc(epsLine)}</div></div>`;
   const sub = $("live-sub");
   if (sub) sub.textContent = appShown && appShown.phase ? appShown.phase : "";
 }
@@ -192,7 +242,14 @@ function uiPaintGrasp() {
   const host = $("grasp");
   if (!host) return;
   if (!appWillGrasp) {
-    host.innerHTML = `<p class="outcome unresolved">not executed</p><p class="small-note">Wrong or unresolved targets are not executed. The operator verifies the target first (Sec. 4.3).</p>`;
+    const outcome = (appShown && appShown.outcome) || "";
+    if (outcome === "none") {
+      host.innerHTML = `<p class="outcome none">not executed</p><p class="small-note">No hidden target was set, so the robot does not grasp.</p>`;
+    } else if (outcome === "correct") {
+      host.innerHTML = `<p class="outcome correct">not executed</p><p class="small-note">The target is correct. Grasp motion is not in this build.</p>`;
+    } else {
+      host.innerHTML = `<p class="outcome unresolved">not executed</p><p class="small-note">Wrong or unresolved targets are not executed. The operator verifies the target first (Sec. 4.3).</p>`;
+    }
     return;
   }
   const belief = appShown && appShown.belief ? appShown.belief : "Resolved target.";
@@ -233,9 +290,11 @@ function uiDrawLanes() {
     g.fill();
     g.font = `600 ${Math.round(11 * dpr)}px "IBM Plex Sans", sans-serif`;
     const brief = uiKindShort[s.kind];
+    const tiny = uiKindTiny[s.kind];
     const pad = 8 * dpr;
     const text = g.measureText(s.kind).width + pad <= bw ? s.kind
-      : (brief && g.measureText(brief).width + pad <= bw ? brief : "");
+      : (brief && g.measureText(brief).width + pad <= bw ? brief
+        : (tiny && g.measureText(tiny).width + 4 * dpr <= bw ? tiny : ""));
     if (text) {
       g.save();
       g.beginPath();
@@ -312,6 +371,10 @@ function uiBindChrome() {
   const yes = $("ui-yes"), no = $("ui-no");
   if (yes) yes.addEventListener("click", () => appAnswer("yes"));
   if (no) no.addEventListener("click", () => appAnswer("no"));
+  const ynYes = $("ui-yn-yes"), ynNo = $("ui-yn-no");
+  if (ynYes) ynYes.addEventListener("click", () => appAnswer("yes"));
+  if (ynNo) ynNo.addEventListener("click", () => appAnswer("no"));
+  uiNarrow.addEventListener("change", () => uiPaint());
 }
 function uiThemeChanged() { uiDrawLanes(); }
 queueMicrotask(() => { uiBindChrome(); uiFitLanes(); });
