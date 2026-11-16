@@ -2035,15 +2035,29 @@ function efe(p, S) {
   return G;
 }
 
+function clFlagCopy(v) {
+  return {
+    exhaustive: !!(v && v.exhaustive),
+    disjoint: !!(v && v.disjoint),
+    legal: !!(v && v.legal),
+    wording: !!(v && v.wording),
+  };
+}
+
+// valid is the proposal after repair. raw is the four flags of the text and branches the
+// simulated VLM produced, before that repair, and equals valid when nothing was damaged.
 function clAnnotate(p, S, scene) {
   const yes = p.yes.slice(), no = p.no.slice();
   const prop = {
     text: p.text, yes, no, key: p.key,
     count: { total: S.length, yes: yes.length, no: no.length },
     valid: { exhaustive: false, disjoint: false, legal: false, wording: false },
+    raw: { exhaustive: false, disjoint: false, legal: false, wording: false },
+    repaired: false, fallback: false,
     G: 0, vlmPick: false,
   };
   prop.valid = validateProp(prop, S);
+  prop.raw = clFlagCopy(prop.valid);
   prop.G = efe(prop, S);
   if (scene) clPropScene.set(prop, scene);
   return prop;
@@ -2197,6 +2211,7 @@ function clSlip(p, S, r) {
 // side?") is reworded relative to the remaining candidates ("Of the ones left, ..."), so the dialogue never
 // repeats a question (Sec. 3.4.1: dialogue history avoids repeating answered questions).
 // slip (default 0 here; runTrial defaults to 0.05) drops a candidate, duplicates one, or leaks an id, then repairs.
+// raw keeps the four flags from before that repair. repaired and fallback say which rewrite ran.
 function proposeQuestions(S, cands, scene, history, opts) {
   const opt = opts || {};
   const K = opt.K == null ? PARAMS.K : opt.K;
@@ -2210,11 +2225,21 @@ function proposeQuestions(S, cands, scene, history, opts) {
   const r = rng((seed >>> 0) || 1);
   const chosen = clSample(pool, K, r);
   const built = [];
-  for (const raw of chosen) {
-    const damaged = slip > 0 && r() < slip ? clSlip(raw, S, r) : raw;
+  for (const drawn of chosen) {
+    const damaged = slip > 0 && r() < slip ? clSlip(drawn, S, r) : drawn;
     const flags = validateProp(damaged, S);
-    if (clFlagsOk(flags)) built.push(clAnnotate(damaged, S, scene));
-    else built.push(repairProp(damaged, S, cands, scene) || fallbackProp(S, cands, scene));
+    let prop;
+    if (clFlagsOk(flags)) prop = clAnnotate(damaged, S, scene);
+    else {
+      prop = repairProp(damaged, S, cands, scene);
+      if (prop) prop.repaired = true;
+      else {
+        prop = fallbackProp(S, cands, scene);
+        prop.fallback = true;
+      }
+      prop.raw = { exhaustive: flags.exhaustive, disjoint: flags.disjoint, legal: flags.legal, wording: flags.wording };
+    }
+    built.push(prop);
   }
   for (const p of built) if (hist.has(p.text)) p.text = "Of the ones left, " + p.text.charAt(0).toLowerCase() + p.text.slice(1);
   const fresh = built.filter((p) => !hist.has(p.text));
@@ -5326,10 +5351,12 @@ function hcBoot() {
 queueMicrotask(hcBoot);
 // ================================================================ Experiments panel (prefix exu)
 // Renders into #exp and writes the headline offline accuracy into #report [data-twin].
-// Headline twin numbers are the mean of seeds 1..5 (paper protocol). The controls run
-// one seed and that batch is detail. Mean |S0|, the multi-candidate rate and the
-// clarifying policies' asked rate by type are calibrated (the detector bands were fitted
-// to them). Every other twin number is out-of-sample.
+// Headline twin numbers are the 5-seed mean of 216 trials per policy per seed. The
+// controls run one seed and that batch is detail. Mean |S0| and the multi-candidate
+// rate are calibrated. The clarifying asked rate by type was a fit target; the panel
+// shows the derived paper figure (pooled × 7/4) and the residual, and does not call a
+// miss agreement. Online grasp % and full-task % are sampled from the paper's category
+// rates. Only the online target accuracy is out-of-sample among those rates.
 // Every twin figure is simulated and is drawn beside the paper's measured number.
 // No Math.random: batches use the seeded protocol in 15-experiments.js.
 // This file is concatenated before 70-loop.js, so CHECKS and window.pc are used
@@ -5352,6 +5379,8 @@ const EXU_SHORT = {
 };
 const EXU_HEAD_SEEDS = [1, 2, 3, 4, 5];
 const EXU_PAIRED = "The batch is paired, so the four clarifying policies have identical accuracy and asked rate by construction; only their question counts differ.";
+const EXU_SAMPLED = "sampled from the paper's category rates (not out-of-sample)";
+const EXU_HEAD = "5-seed mean of 216 trials per policy per seed";
 
 let exuLast = null;
 let exuHead = null;
@@ -5486,9 +5515,18 @@ function exuAverage(batches) {
   return { summary, pooled, clarify, meanS0: summary.activask.meanS0, multi: summary.activask.multi };
 }
 
+function exuSigned(v, d = 2) {
+  if (v == null || !Number.isFinite(Number(v))) return "–";
+  const n = Number(v);
+  return (n > 0 ? "+" : "") + n.toFixed(d);
+}
+
 function exuTag(kind) {
   if (kind === "calibrated") {
     return `<span class="exu-tag exu-cal" title="Detector bands were fitted to this. Agreement is by construction.">calibrated</span>`;
+  }
+  if (kind === "sampled") {
+    return `<span class="exu-tag" title="${exuEsc(EXU_SAMPLED)}">sampled</span>`;
   }
   return `<span class="exu-tag" title="Not a fitted row.">out-of-sample</span>`;
 }
@@ -5540,8 +5578,8 @@ function exuOfflineTable(summary, mode) {
       ${exuSide(exuFmt(twin.qAsked), "", true, `mean questions on asked trials · ${oos}`)}</tr>`;
   }).join("");
   const heading = headline
-    ? `Offline, seeds 1–5 <em>mean · out-of-sample</em>`
-    : `This seed <em>detail · out-of-sample</em>`;
+    ? `Offline, seeds 1–5 <em>${EXU_HEAD} · out-of-sample</em>`
+    : `This seed <em>detail · 216 trials per policy · out-of-sample</em>`;
   const accHead = headline ? "Acc %" : "Acc % ± CI";
   return `<h3 class="sec-h">${heading}</h3>
     <table class="grid exu-metrics"><colgroup><col class="exu-c-name"><col class="exu-c-acc"><col><col><col></colgroup>
@@ -5554,27 +5592,53 @@ function exuOnlineTable(summary) {
     const paper = PAPER.online[p.id];
     const twin = summary[p.id];
     if (!paper || !twin) return "";
-    const oos = "out-of-sample · twin (simulated)";
     const accTip = `target % · paper ${exuCi(paper.targetCi)} · twin (simulated) ${exuCi(twin.ci)} · out-of-sample`;
-    const graspTip = `grasp % · paper ${exuCi(paper.graspCi)} · twin (simulated) ${exuCi(twin.graspCi)} · out-of-sample`;
-    const fullTip = `full-task % · paper ${exuCi(paper.fullCi)} · twin (simulated) ${exuCi(twin.fullCi)} · Q asked paper ${paper.q == null ? "–" : exuFmt(paper.q)}, twin (simulated) ${exuFmt(twin.qAsked)} · out-of-sample`;
+    const graspTip = `grasp % · paper ${exuCi(paper.graspCi)} · twin (simulated) ${exuCi(twin.graspCi)} · ${EXU_SAMPLED}`;
+    const fullTip = `full-task % · paper ${exuCi(paper.fullCi)} · twin (simulated) ${exuCi(twin.fullCi)} · Q asked paper ${paper.q == null ? "–" : exuFmt(paper.q)}, twin (simulated) ${exuFmt(twin.qAsked)} · ${EXU_SAMPLED}`;
     return `<tr>${exuNameCell(p.id, 2)}
       ${exuSide(exuFmt(paper.targetAcc), "", false, accTip)}
-      ${exuSide(exuInt(paper.attempts), "", false, "grasp attempts")}
+      ${exuSide(exuInt(paper.attempts), "", false, "grasp attempts · twin count")}
       ${exuSide(exuFmt(paper.grasp), "", false, graspTip)}
       ${exuSide(exuFmt(paper.full), "", false, fullTip)}
-      ${exuSide(exuInt(paper.nonExec), "", false, "not executed")}</tr>
+      ${exuSide(exuInt(paper.nonExec), "", false, "not executed · twin count")}</tr>
     <tr class="exu-twin">
-      ${exuSide(exuFmt(twin.acc), "", true, accTip)}
-      ${exuSide(exuInt(twin.attempts), "", true, `grasp attempts · ${oos}`)}
-      ${exuSide(exuFmt(twin.grasp), "", true, graspTip)}
-      ${exuSide(exuFmt(twin.full), "", true, fullTip)}
-      ${exuSide(exuInt(twin.nonExec), "", true, `not executed · ${oos}`)}</tr>`;
+      ${exuSide(exuFmt(twin.acc), "", true, accTip, "oos")}
+      ${exuSide(exuInt(twin.attempts), "", true, "grasp attempts · twin count")}
+      ${exuSide(exuFmt(twin.grasp), "", true, graspTip, "sampled")}
+      ${exuSide(exuFmt(twin.full), "", true, fullTip, "sampled")}
+      ${exuSide(exuInt(twin.nonExec), "", true, "not executed · twin count")}</tr>`;
   }).join("");
-  return `<h3 class="sec-h">Online, this seed <em>detail · out-of-sample</em></h3>
+  return `<h3 class="sec-h">Online, this seed <em>detail · target accuracy out-of-sample</em></h3>
     <table class="grid exu-metrics exu-online"><colgroup><col class="exu-c-name"><col class="exu-c-acc"><col><col><col><col></colgroup>
-    <thead><tr><th>Policy</th><th>Target %</th><th>Tries</th><th>Grasp %</th><th>Full %</th><th>Skip</th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="small-note">Grasp success is a category-rate draw from the paper. Out-of-sample. A wrong or unresolved target is not executed.</p>`;
+    <thead><tr><th>Policy</th><th>Target %</th><th>Tries</th><th title="${exuEsc(EXU_SAMPLED)}">Grasp %</th><th title="${exuEsc(EXU_SAMPLED)}">Full %</th><th>Skip</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small-note">Grasp % and full-task % are ${EXU_SAMPLED}. Only the target accuracy is out-of-sample. A wrong or unresolved target is not executed.</p>`;
+}
+
+function exuAskedCell(type, view) {
+  const paper = PAPER.byType[type];
+  const nC = exuClarifyIds().length || 1;
+  const factor = `${POLICIES.length}/${nC}`;
+  const derived = exuPaperClarifyAsked(type);
+  const twin = view.clarify[type].asked;
+  const residual = twin - derived;
+  const rel = derived ? (100 * residual) / derived : 0;
+  const deriv = `derived ${exuFmt(paper.asked)} × ${factor}`;
+  const tip = `clarifying asked % · ${deriv} = ${exuFmt(derived)} · twin ${exuFmt(twin)} · residual ${exuSigned(residual)} pt (${exuSigned(rel, 0)}% of the derived rate) · fitted toward this row · not agreement`;
+  return `<td title="${exuEsc(tip)}"><span class="exu-p">${exuFmt(derived)}</span><span class="exu-der">${exuEsc(deriv)}</span><span class="exu-t">${exuFmt(twin)}</span><span class="exu-sim">sim</span><span class="exu-tag exu-cal">fitted · ${exuSigned(residual)} pt</span></td>`;
+}
+
+function exuTypeNote(view) {
+  const nC = exuClarifyIds().length || 1;
+  const factor = `${POLICIES.length}/${nC}`;
+  const bits = INSTR_TYPES.map((type) => {
+    const derived = exuPaperClarifyAsked(type);
+    const twin = view.clarify[type].asked;
+    const residual = twin - derived;
+    const rel = derived ? (100 * residual) / derived : 0;
+    const name = type.charAt(0).toUpperCase() + type.slice(1);
+    return `${name} ${exuFmt(twin)} against derived ${exuFmt(derived)} (${exuSigned(residual)} pt, ${exuSigned(rel, 0)}%)`;
+  });
+  return `Asked % is the clarifying policies only. The paper figure is derived: the published pooled rate × ${factor}. ${bits.join("; ")}. A residual is not agreement. Acc % and Q asked are out-of-sample.`;
 }
 
 function exuTypeTable(view) {
@@ -5582,17 +5646,14 @@ function exuTypeTable(view) {
   const rows = INSTR_TYPES.map((type) => {
     const paper = PAPER.byType[type];
     const pool = view.pooled[type];
-    const askedPaper = exuPaperClarifyAsked(type);
-    const askedTwin = view.clarify[type].asked;
     const accTip = `accuracy % · pooled over methods · paper ${exuFmt(paper.acc)} · twin ${exuFmt(pool.acc)} · out-of-sample`;
-    const askedTip = `clarifying policies' asked % · paper pooled ${exuFmt(paper.asked)} × ${POLICIES.length}/${exuClarifyIds().length} = ${exuFmt(askedPaper)} · twin ${exuFmt(askedTwin)} · calibrated · agreement by construction`;
     const qPaper = paper.qAsked == null ? "–" : exuFmt(paper.qAsked);
     const qTip = `mean questions on asked trials · paper ${qPaper} · twin ${exuFmt(pool.qAsked)} · out-of-sample`;
-    return `<tr><td class="exu-name">${label[type]}</td>${exuPair(exuFmt(paper.acc), exuFmt(pool.acc), accTip)}${exuPair(exuFmt(askedPaper), exuFmt(askedTwin), askedTip, "calibrated")}${exuPair(qPaper, exuFmt(pool.qAsked), qTip)}</tr>`;
+    return `<tr><td class="exu-name">${label[type]}</td>${exuPair(exuFmt(paper.acc), exuFmt(pool.acc), accTip)}${exuAskedCell(type, view)}${exuPair(qPaper, exuFmt(pool.qAsked), qTip)}</tr>`;
   }).join("");
-  return `<h3 class="sec-h">By instruction type <em>asked rate calibrated</em></h3>
+  return `<h3 class="sec-h">By instruction type <em>asked rate fitted, residual shown</em></h3>
     <table class="grid exu-metrics"><thead><tr><th>Type</th><th>Acc %</th><th>Asked %</th><th>Q asked</th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="small-note">Asked % is the clarifying policies only, and it is calibrated. The paper figure is the published pooled rate times 7/4. Acc % and Q asked are out-of-sample.</p>`;
+    <p class="small-note">${exuTypeNote(view)}</p>`;
 }
 
 function exuCalibrated(view) {
@@ -5604,12 +5665,12 @@ function exuCalibrated(view) {
     <tr><td class="exu-name">mean |S0|</td>${exuSide(exuFmt(PAPER.offlineSet.meanS0), "", false, s0Tip)}${exuSide(exuFmt(view.meanS0), "", true, s0Tip, "calibrated")}</tr>
     <tr><td class="exu-name">multi %</td>${exuSide(exuFmt(PAPER.offlineSet.multiCandidate.pct), "", false, multiTip)}${exuSide(exuFmt(view.multi), "", true, multiTip, "calibrated")}</tr>
     </tbody></table>
-    <p class="small-note">The detector bands were fitted to mean |S0|, the multi-candidate rate and the clarifying policies' asked rate by type. Agreement there is by construction.</p>`;
+    <p class="small-note">The detector bands were fitted to mean |S0| and the multi-candidate rate. Agreement on those two rows is by construction. The asked-rate rows were a fit target; the residual is on that table and is not agreement.</p>`;
 }
 
 function exuHeadlineBlock(head) {
   if (!head) return "";
-  return `<p class="small-note">Headline · mean of seeds 1–5 · ${head.ms.toFixed(0)} ms · ε 0 · K ${PARAMS.K} · slip 0.05</p>`
+  return `<p class="small-note">Headline · ${EXU_HEAD} · ${head.ms.toFixed(0)} ms · ε 0 · K ${PARAMS.K} · slip 0.05</p>`
     + exuCalibrated(head)
     + exuOfflineTable(head.summary, "headline")
     + exuTypeTable(head);
@@ -5767,7 +5828,33 @@ function exuFillTwin(summary) {
     if (!cell || !row) continue;
     cell.textContent = exuFmt(row.acc);
     const range = row.accLo != null ? ` · range ${exuFmt(row.accLo)}–${exuFmt(row.accHi)}` : "";
-    cell.title = `Mean of seeds 1–5 ${exuFmt(row.acc)}${range} · out-of-sample · twin (simulated)`;
+    cell.title = `${EXU_HEAD} · ${exuFmt(row.acc)}${range} · out-of-sample · twin (simulated)`;
+  }
+  exuMarkReportHeader();
+}
+
+// The Paper-vs-twin card is rendered by the ui module. State the twin column here,
+// in this file, so the visible header matches the five-seed mean that fills it.
+function exuMarkReportHeader() {
+  const report = $("report");
+  if (!report) return;
+  const h = report.querySelector("h3");
+  if (h) {
+    let em = h.querySelector("em");
+    if (!em) {
+      em = document.createElement("em");
+      h.appendChild(document.createTextNode(" "));
+      h.appendChild(em);
+    }
+    em.textContent = `paper: 216 trials per method · twin column: ${EXU_HEAD}`;
+  }
+  for (const th of report.querySelectorAll("thead th")) {
+    if (!/twin/i.test(th.textContent)) continue;
+    const sim = th.querySelector(".tag-sim");
+    th.textContent = "";
+    th.title = EXU_HEAD;
+    th.appendChild(document.createTextNode("Twin acc % "));
+    if (sim) th.appendChild(sim);
   }
 }
 
@@ -5888,6 +5975,7 @@ function exuMount() {
     #exp .exu-p { display: block; color: var(--muted); white-space: nowrap; }
     #exp .exu-t { display: block; color: var(--ink); font-weight: 500; white-space: nowrap; }
     #exp .exu-ci { display: block; color: var(--faint); font-size: 9px; white-space: nowrap; }
+    #exp .exu-der { display: block; color: var(--faint); font-size: 9px; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; }
     #exp .exu-tag { display: block; max-width: 100%; font: 7.5px/1.15 var(--mono); font-style: normal; letter-spacing: 0.01em; text-transform: uppercase; color: var(--faint); white-space: normal; overflow-wrap: anywhere; margin-top: 1px; }
     #exp .exu-cal { color: var(--accent); }
     #report table.grid { table-layout: fixed; width: 100%; font-size: 10.5px; }
@@ -5918,7 +6006,7 @@ function exuMount() {
     <button class="btn" id="exu-run" type="button">Run batch</button>
     <button class="btn" id="exu-csv" type="button" disabled>Copy batch CSV</button>
   </div>
-  <p class="small-note">The controls run one seed. Headline numbers are the mean of seeds 1–5.</p>
+  <p class="small-note">The controls run one seed. The headline and the Paper column are the ${EXU_HEAD}.</p>
   <p id="exu-status" class="small-note" aria-live="polite">Running seeds 1–5…</p>
   <div id="exu-head"></div>
   <div id="exu-charts"></div>
