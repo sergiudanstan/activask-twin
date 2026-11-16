@@ -1,17 +1,19 @@
 # Report: expui (Experiments panel) · Grok
 
-Branch `feat/expui`. New file `src/js/67-expui.js` (prefix `exu`). No edits to `page.html`, `50`, `60`, `65`, `66`, or `14-clarify.js`. Every twin figure is labelled simulated and sits beside `PAPER`. The panel opens on the M5 protocol seed **11**.
+Branch `feat/expui`. New file `src/js/67-expui.js` (prefix `exu`). No edits to `page.html`, `50`, `60`, `65`, `66`, or `14-clarify.js`. Every twin figure is labelled simulated and sits beside `PAPER`.
+
+Headline twin numbers are the mean of offline seeds **1–5** at ε 0, K 4, slip 0.05 (126 ms for the five batches). The controls run one seed, default **11**, and that batch is the detail. Mean |S0|, the multi-candidate rate and the clarifying policies' asked rate by type are marked calibrated. Every other twin number is out-of-sample.
 
 ## What was built
 
 - Controls in `#exp`: set (offline / online), seed, ε, K, slip. **Run batch** calls `runBatch` synchronously and is disabled while that run is in flight. **Copy batch CSV** writes one row per trial (scene, instruction, type, policy, |S0|, questions, outcome, and the online grasp fields).
-- On load, `queueMicrotask` runs one offline batch (7 × 216) plus `epsSweep` and `kSweep` at the same seed, so the paper table's twin column is filled without a click. Measured about 100–115 ms for the three together.
+- On load, `queueMicrotask` runs the five headline batches, then one detail batch at the controls plus `epsSweep` and `kSweep` at that seed. The paper table's twin column is the five-seed mean. A later Run batch, including an online one, does not replace it.
 - Tables, paper on the muted row and the twin on the tinted row: offline accuracy with the Wilson interval, asked %, Q all, Q on asked trials; online target accuracy, attempts, grasp %, full-task %, non-executed; instruction type pooled over the batch.
 - Three inline SVGs, coloured with the page's CSS variables (`--ink`, `--accent`, `--scara`, `--delta`, `--vision`, `--bad`, `--press`, `--faint`, `--line`), so light and dark (including `prefers-color-scheme`) restyle them without a redraw.
   1. Mean questions by |S0| = 2..6: ideal, paper ActivAsk, twin ActivAsk, twin firstQ / randomQ / vlmQ.
   2. Accuracy vs ε = 0..0.2: paper (dashed) and twin (solid) for the four clarifying policies.
   3. Mean minimum G vs K = 1..5 for partial and ambiguous, beside `PAPER.kSweep`.
-- `#report [data-twin]` gets the offline accuracy. The Wilson interval is the cell's `title`. Seed 11: top 59.26, random 55.56, directVLM 59.72, and 89.35 for firstQ, randomQ, vlmQ and ActivAsk.
+- `#report [data-twin]` gets the five-seed mean accuracy, as a bare number. The cell title is that mean, the range across the five seeds, and out-of-sample. It is not a Wilson interval of the pooled trials. Seeds 1–5: top 60.00 (range 58.80–61.11), random 54.72 (52.31–56.48), directVLM 60.37 (59.26–61.57), and 86.85 (83.80–87.96) for firstQ, randomQ, vlmQ and ActivAsk.
 - `CHECKS` entry `experiments panel`: 7 numeric twin cells and the three charts. This branch's `70-loop.js` does not declare `CHECKS` yet (the lead's main checkout does). The panel pushes when that array exists, and otherwise folds the same check into `window.pc.checks`. Shots reported `ok: true` with detail `7 twin accuracies and 3 charts`.
 
 ## Checks
@@ -19,9 +21,17 @@ Branch `feat/expui`. New file `src/js/67-expui.js` (prefix `exu`). No edits to `
 - `npm test`: **146 passed, 0 failed** (5 files), ends `all checks passed`.
 - `npm run perturb`: **15 of 15 CAUGHT**. No new perturbation: `67-expui.js` is outside the logic block, so `tests/run.mjs` cannot see it. The M5 perturbations still fire.
 - `node tools/shots.mjs --port 8793 --query "panels=exp,report" --view iso --t 1 --out _shots/expui`: **console errors: 0**, `pc.checks()` ok. Shot: `_shots/expui/iso_1.0.png`.
+- After the review, the same headless Chrome (port 8793, `panels=exp,report`): console errors 0, `experiments panel` ok. The paper column stayed on the five-seed means when the detail seed changed to 2 and when the detail set changed to online. Seed 11 detail intervals stay on one line (52.60–65.59, 84.53–92.80). No table cell crossed the drawer edge. Dark `--ink` was `#ece6e1`.
 - Also exercised in headless Chrome, then inspected the drawer crops: scrolled to the offline table, ran an online batch, changed the seed to 2 (the twin column moved, top 59.26 → 61.11), copied the CSV (1513 lines = header + 1512 trials), and reloaded under `prefers-color-scheme: dark`. Dark `--ink` was `#ece6e1`, the grid stroke followed `--line`, and the charts stayed readable. Axes are labelled, legends sit under the plots, and the confidence intervals stay on one line.
 
-## Twin numbers at seed 11 (simulated)
+## Review (SPEC §4, d4aaf96)
+
+- Calibrated, with the word on the row: mean |S0| 2.48 (paper 2.49), multi-candidate 46.57% (paper 46.10), and the clarifying policies' asked rate by type. Clear 2.22 (paper clarifying 3.13), partial 47.78 (46.62), ambiguous 89.72 (91.65). The paper figure next to that column is the published pooled asked rate times 7/4, because three of the seven methods never ask. Agreement on those rows is by construction of the detector fit.
+- Out-of-sample: the headline accuracies, asked % and question counts per policy, accuracy and Q asked by type, the online rates, and the three charts. The section heading says so, and each value's title says so. A badge on every cell wrapped inside the 312 px drawer and covered the digits, so the badge is reserved for the calibrated rows.
+- One line under each offline table (the five-seed mean and the single-seed detail): "The batch is paired, so the four clarifying policies have identical accuracy and asked rate by construction; only their question counts differ." Checked on seeds 1–5: within each seed the four accuracies match and the four asked rates match.
+- The three charts stay the single detail seed (default 11), labelled out-of-sample. Averaging the sweeps would blow the ~0.2 s the headline is budgeted for.
+
+## Twin numbers at seed 11 (detail, simulated)
 
 Offline, 216 trials per policy. Paper in parentheses.
 
@@ -51,8 +61,8 @@ The ε chart starts at 100 for the twin: the sweep keeps only trials with the ta
 
 ## Assumptions
 
-- Seed 11 is the default because it is the M5 draw that sits inside the calibration windows. Seed 1's partial asked-rate was only 1.3 pp above the floor.
-- The ε and K charts are the paper's sweeps (`epsSweep` N = 98, `kSweep` K = 1..5), not the batch's single ε and K. They follow the panel seed and stay at K = 4 and slip 0.05 so the dashed paper series stay comparable. The controls apply to `runBatch` only.
+- Seed 11 stays the detail default because it is the M5 draw inside the calibration windows. It is not the number in the paper column. The headline ignores the seed, ε, K and slip controls and always averages seeds 1–5 at ε 0, K 4, slip 0.05. The mean is the mean of the five percentages. The title shows the min–max across seeds. A Wilson interval on 5 × 216 would be a different claim, so it is not printed on the headline.
+- The ε and K charts are the paper's sweeps (`epsSweep` N = 98, `kSweep` K = 1..5), not the batch's single ε and K. They follow the detail seed and stay at K = 4 and slip 0.05 so the dashed paper series stay comparable. The controls apply to the detail `runBatch` only.
 - The paper table's `white-space: nowrap` pushed the twin column past the drawer edge. The panel's stylesheet makes `#report table.grid` fit the 360 px drawer (policy names wrap, the five columns share the width). `60-ui.js` and `page.html` were not edited.
 - The report card's **Copy trials CSV** is the ui worker's session log. This panel's button copies the batch. They are different files of rows.
 - Grasp success is the M5 category-rate draw. It will not match the paper's per-policy grasp rates.

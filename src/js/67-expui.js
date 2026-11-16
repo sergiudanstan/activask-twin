@@ -1,5 +1,9 @@
 // ================================================================ Experiments panel (prefix exu)
-// Renders into #exp and writes offline accuracy into #report [data-twin].
+// Renders into #exp and writes the headline offline accuracy into #report [data-twin].
+// Headline twin numbers are the mean of seeds 1..5 (paper protocol). The controls run
+// one seed and that batch is detail. Mean |S0|, the multi-candidate rate and the
+// clarifying policies' asked rate by type are calibrated (the detector bands were fitted
+// to them). Every other twin number is out-of-sample.
 // Every twin figure is simulated and is drawn beside the paper's measured number.
 // No Math.random: batches use the seeded protocol in 15-experiments.js.
 // This file is concatenated before 70-loop.js, so CHECKS and window.pc are used
@@ -20,8 +24,11 @@ const EXU_SHORT = {
   vlmQ: "VLM Q",
   activask: "ActivAsk",
 };
+const EXU_HEAD_SEEDS = [1, 2, 3, 4, 5];
+const EXU_PAIRED = "The batch is paired, so the four clarifying policies have identical accuracy and asked rate by construction; only their question counts differ.";
 
 let exuLast = null;
+let exuHead = null;
 
 function exuEsc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
@@ -42,8 +49,29 @@ function exuCi(ci) {
   return `${exuFmt(ci[0])}–${exuFmt(ci[1])}`;
 }
 
+function exuMean(values) {
+  const xs = [];
+  for (const v of values) if (v != null && Number.isFinite(Number(v))) xs.push(Number(v));
+  if (!xs.length) return null;
+  let s = 0;
+  for (const v of xs) s += v;
+  return s / xs.length;
+}
+
 function exuPolicy(id) {
   return POLICIES.find((p) => p.id === id) || { id, label: id };
+}
+
+function exuClarifyIds() {
+  return POLICIES.filter((p) => p.clarifies).map((p) => p.id);
+}
+
+// Published by-type asked % is pooled over every method. Three of the seven never ask,
+// so the clarifying policies' rate — the row the detector was fitted to — is that
+// pooled figure times 7/4.
+function exuPaperClarifyAsked(type) {
+  const nClarify = exuClarifyIds().length || 1;
+  return PAPER.byType[type].asked * POLICIES.length / nClarify;
 }
 
 function exuControls() {
@@ -82,10 +110,68 @@ function exuByType(trials) {
   return out;
 }
 
-function exuPair(paper, twin, title) {
+// Mean of several offline batches. Accuracy is the mean of the per-seed rates.
+// accLo/accHi is the range across seeds, not a Wilson interval.
+function exuAverage(batches) {
+  const summary = {};
+  for (const p of POLICIES) {
+    const rows = batches.map((b) => b.summary[p.id]);
+    const accs = rows.map((r) => r.acc);
+    summary[p.id] = {
+      n: rows[0].n,
+      acc: exuMean(accs),
+      accLo: Math.min(...accs),
+      accHi: Math.max(...accs),
+      asked: exuMean(rows.map((r) => r.asked)),
+      qAll: exuMean(rows.map((r) => r.qAll)),
+      qAsked: exuMean(rows.map((r) => r.qAsked)),
+      meanS0: exuMean(rows.map((r) => r.meanS0)),
+      multi: exuMean(rows.map((r) => r.multi)),
+      byType: {},
+    };
+    for (const type of INSTR_TYPES) {
+      const bt = rows.map((r) => r.byType[type]);
+      summary[p.id].byType[type] = {
+        n: bt[0].n,
+        acc: exuMean(bt.map((r) => r.acc)),
+        asked: exuMean(bt.map((r) => r.asked)),
+        qAsked: exuMean(bt.map((r) => r.qAsked)),
+      };
+    }
+  }
+  const pooled = {};
+  const clarify = {};
+  const perSeed = batches.map((b) => exuByType(b.trials));
+  for (const type of INSTR_TYPES) {
+    pooled[type] = {
+      n: perSeed[0][type].n,
+      acc: exuMean(perSeed.map((s) => s[type].acc)),
+      asked: exuMean(perSeed.map((s) => s[type].asked)),
+      qAsked: exuMean(perSeed.map((s) => s[type].qAsked)),
+    };
+    const bt = batches.map((b) => b.summary.activask.byType[type]);
+    clarify[type] = {
+      n: bt[0].n,
+      asked: exuMean(bt.map((r) => r.asked)),
+      acc: exuMean(bt.map((r) => r.acc)),
+      qAsked: exuMean(bt.map((r) => r.qAsked)),
+    };
+  }
+  return { summary, pooled, clarify, meanS0: summary.activask.meanS0, multi: summary.activask.multi };
+}
+
+function exuTag(kind) {
+  if (kind === "calibrated") {
+    return `<span class="exu-tag exu-cal" title="Detector bands were fitted to this. Agreement is by construction.">calibrated</span>`;
+  }
+  return `<span class="exu-tag" title="Not a fitted row.">out-of-sample</span>`;
+}
+
+function exuPair(paper, twin, title, tag) {
   const badge = twin === "–" ? "" : `<span class="exu-sim">sim</span>`;
   const tip = title ? ` title="${exuEsc(title)}"` : "";
-  return `<td${tip}><span class="exu-p">${paper}</span><span class="exu-t">${twin}</span>${badge}</td>`;
+  const mark = tag ? exuTag(tag) : "";
+  return `<td${tip}><span class="exu-p">${paper}</span><span class="exu-t">${twin}</span>${badge}${mark}</td>`;
 }
 
 function exuNameCell(id, span) {
@@ -96,33 +182,45 @@ function exuNameCell(id, span) {
 
 // One number per line. The paper row is muted; the twin row carries the sim mark.
 // A confidence interval stays on its own line so it is not cut at the dash.
-function exuSide(text, ci, twin, title) {
+// `tag` is "calibrated" or "oos" and is drawn under the twin number, not inside it.
+function exuSide(text, ci, twin, title, tag) {
   const tip = title ? ` title="${exuEsc(title)}"` : "";
   const badge = twin && text !== "–" ? `<span class="exu-sim">sim</span>` : "";
   const line = ci ? `<span class="exu-ci">${ci}</span>` : "";
-  return `<td${tip}><span class="${twin ? "exu-t" : "exu-p"}">${text}</span>${badge}${line}</td>`;
+  const mark = twin && tag ? exuTag(tag) : "";
+  return `<td${tip}><span class="${twin ? "exu-t" : "exu-p"}">${text}</span>${badge}${line}${mark}</td>`;
 }
 
-function exuOfflineTable(summary) {
+function exuOfflineTable(summary, mode) {
+  const headline = mode === "headline";
   const rows = POLICIES.map((p) => {
     const paper = PAPER.offline[p.id];
     const twin = summary[p.id];
     if (!paper || !twin) return "";
-    const accTip = `paper ${exuFmt(paper.acc)} [${exuCi(paper.ci)}] · twin (simulated) ${exuFmt(twin.acc)} [${exuCi(twin.ci)}]`;
+    const accTip = headline
+      ? `mean of seeds 1–5 ${exuFmt(twin.acc)} · range ${exuFmt(twin.accLo)}–${exuFmt(twin.accHi)} · out-of-sample · twin (simulated)`
+      : `paper ${exuFmt(paper.acc)} [${exuCi(paper.ci)}] · twin (simulated) ${exuFmt(twin.acc)} [${exuCi(twin.ci)}] · out-of-sample`;
+    const ci = headline ? "" : exuCi(twin.ci);
+    const oos = "out-of-sample · twin (simulated)";
     return `<tr>${exuNameCell(p.id, 2)}
       ${exuSide(exuFmt(paper.acc), exuCi(paper.ci), false, accTip)}
       ${exuSide(exuFmt(paper.asked), "", false, "asked %")}
       ${exuSide(exuFmt(paper.qAll), "", false, "mean questions, all trials")}
       ${exuSide(paper.qAsked == null ? "–" : exuFmt(paper.qAsked), "", false, "mean questions on asked trials")}</tr>
     <tr class="exu-twin">
-      ${exuSide(exuFmt(twin.acc), exuCi(twin.ci), true, accTip)}
-      ${exuSide(exuFmt(twin.asked), "", true, "asked % · twin (simulated)")}
-      ${exuSide(exuFmt(twin.qAll), "", true, "mean questions, all trials · twin (simulated)")}
-      ${exuSide(exuFmt(twin.qAsked), "", true, "mean questions on asked trials · twin (simulated)")}</tr>`;
+      ${exuSide(exuFmt(twin.acc), ci, true, accTip)}
+      ${exuSide(exuFmt(twin.asked), "", true, `asked % · ${oos}`)}
+      ${exuSide(exuFmt(twin.qAll), "", true, `mean questions, all trials · ${oos}`)}
+      ${exuSide(exuFmt(twin.qAsked), "", true, `mean questions on asked trials · ${oos}`)}</tr>`;
   }).join("");
-  return `<h3 class="sec-h">Offline, per policy <em>paper, then twin</em></h3>
+  const heading = headline
+    ? `Offline, seeds 1–5 <em>mean · out-of-sample</em>`
+    : `This seed <em>detail · out-of-sample</em>`;
+  const accHead = headline ? "Acc %" : "Acc % ± CI";
+  return `<h3 class="sec-h">${heading}</h3>
     <table class="grid exu-metrics"><colgroup><col class="exu-c-name"><col class="exu-c-acc"><col><col><col></colgroup>
-    <thead><tr><th>Policy</th><th>Acc % ± CI</th><th>Asked %</th><th>Q all</th><th>Q asked</th></tr></thead><tbody>${rows}</tbody></table>`;
+    <thead><tr><th>Policy</th><th>${accHead}</th><th>Asked %</th><th>Q all</th><th>Q asked</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small-note">${EXU_PAIRED}</p>`;
 }
 
 function exuOnlineTable(summary) {
@@ -130,9 +228,10 @@ function exuOnlineTable(summary) {
     const paper = PAPER.online[p.id];
     const twin = summary[p.id];
     if (!paper || !twin) return "";
-    const accTip = `target % · paper ${exuCi(paper.targetCi)} · twin (simulated) ${exuCi(twin.ci)}`;
-    const graspTip = `grasp % · paper ${exuCi(paper.graspCi)} · twin (simulated) ${exuCi(twin.graspCi)}`;
-    const fullTip = `full-task % · paper ${exuCi(paper.fullCi)} · twin (simulated) ${exuCi(twin.fullCi)} · Q asked paper ${paper.q == null ? "–" : exuFmt(paper.q)}, twin (simulated) ${exuFmt(twin.qAsked)}`;
+    const oos = "out-of-sample · twin (simulated)";
+    const accTip = `target % · paper ${exuCi(paper.targetCi)} · twin (simulated) ${exuCi(twin.ci)} · out-of-sample`;
+    const graspTip = `grasp % · paper ${exuCi(paper.graspCi)} · twin (simulated) ${exuCi(twin.graspCi)} · out-of-sample`;
+    const fullTip = `full-task % · paper ${exuCi(paper.fullCi)} · twin (simulated) ${exuCi(twin.fullCi)} · Q asked paper ${paper.q == null ? "–" : exuFmt(paper.q)}, twin (simulated) ${exuFmt(twin.qAsked)} · out-of-sample`;
     return `<tr>${exuNameCell(p.id, 2)}
       ${exuSide(exuFmt(paper.targetAcc), "", false, accTip)}
       ${exuSide(exuInt(paper.attempts), "", false, "grasp attempts")}
@@ -141,27 +240,53 @@ function exuOnlineTable(summary) {
       ${exuSide(exuInt(paper.nonExec), "", false, "not executed")}</tr>
     <tr class="exu-twin">
       ${exuSide(exuFmt(twin.acc), "", true, accTip)}
-      ${exuSide(exuInt(twin.attempts), "", true, "grasp attempts · twin (simulated)")}
+      ${exuSide(exuInt(twin.attempts), "", true, `grasp attempts · ${oos}`)}
       ${exuSide(exuFmt(twin.grasp), "", true, graspTip)}
       ${exuSide(exuFmt(twin.full), "", true, fullTip)}
-      ${exuSide(exuInt(twin.nonExec), "", true, "not executed · twin (simulated)")}</tr>`;
+      ${exuSide(exuInt(twin.nonExec), "", true, `not executed · ${oos}`)}</tr>`;
   }).join("");
-  return `<h3 class="sec-h">Online, per policy <em>paper, then twin</em></h3>
+  return `<h3 class="sec-h">Online, this seed <em>detail · out-of-sample</em></h3>
     <table class="grid exu-metrics exu-online"><colgroup><col class="exu-c-name"><col class="exu-c-acc"><col><col><col><col></colgroup>
     <thead><tr><th>Policy</th><th>Target %</th><th>Tries</th><th>Grasp %</th><th>Full %</th><th>Skip</th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="small-note">Grasp success is a category-rate draw from the paper. Twin (simulated). A wrong or unresolved target is not executed.</p>`;
+    <p class="small-note">Grasp success is a category-rate draw from the paper. Out-of-sample. A wrong or unresolved target is not executed.</p>`;
 }
 
-function exuTypeTable(trials) {
-  const twin = exuByType(trials);
+function exuTypeTable(view) {
   const label = { clear: "Clear", partial: "Partial", ambiguous: "Ambiguous" };
   const rows = INSTR_TYPES.map((type) => {
     const paper = PAPER.byType[type];
-    const row = twin[type];
-    return `<tr><td class="exu-name">${label[type]}</td>${exuPair(exuFmt(paper.acc), exuFmt(row.acc), `accuracy % · n paper ${paper.n}, twin (simulated) ${row.n}`)}${exuPair(exuFmt(paper.asked), exuFmt(row.asked), "asked % · pooled over methods · twin (simulated)")}${exuPair(paper.qAsked == null ? "–" : exuFmt(paper.qAsked), exuFmt(row.qAsked), "mean questions on asked trials · twin (simulated)")}</tr>`;
+    const pool = view.pooled[type];
+    const askedPaper = exuPaperClarifyAsked(type);
+    const askedTwin = view.clarify[type].asked;
+    const accTip = `accuracy % · pooled over methods · paper ${exuFmt(paper.acc)} · twin ${exuFmt(pool.acc)} · out-of-sample`;
+    const askedTip = `clarifying policies' asked % · paper pooled ${exuFmt(paper.asked)} × ${POLICIES.length}/${exuClarifyIds().length} = ${exuFmt(askedPaper)} · twin ${exuFmt(askedTwin)} · calibrated · agreement by construction`;
+    const qPaper = paper.qAsked == null ? "–" : exuFmt(paper.qAsked);
+    const qTip = `mean questions on asked trials · paper ${qPaper} · twin ${exuFmt(pool.qAsked)} · out-of-sample`;
+    return `<tr><td class="exu-name">${label[type]}</td>${exuPair(exuFmt(paper.acc), exuFmt(pool.acc), accTip)}${exuPair(exuFmt(askedPaper), exuFmt(askedTwin), askedTip, "calibrated")}${exuPair(qPaper, exuFmt(pool.qAsked), qTip)}</tr>`;
   }).join("");
-  return `<h3 class="sec-h">By instruction type <em>pooled</em></h3>
-    <table class="grid exu-metrics"><thead><tr><th>Type</th><th>Acc %</th><th>Asked %</th><th>Q asked</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<h3 class="sec-h">By instruction type <em>asked rate calibrated</em></h3>
+    <table class="grid exu-metrics"><thead><tr><th>Type</th><th>Acc %</th><th>Asked %</th><th>Q asked</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small-note">Asked % is the clarifying policies only, and it is calibrated. The paper figure is the published pooled rate times 7/4. Acc % and Q asked are out-of-sample.</p>`;
+}
+
+function exuCalibrated(view) {
+  const s0Tip = `mean |S0| · paper ${exuFmt(PAPER.offlineSet.meanS0)} · twin ${exuFmt(view.meanS0)} · calibrated · detector bands were fitted to this row`;
+  const multiTip = `multi-candidate % · paper ${exuFmt(PAPER.offlineSet.multiCandidate.pct)} · twin ${exuFmt(view.multi)} · calibrated · detector bands were fitted to this row`;
+  return `<h3 class="sec-h">Fitted rows <em>calibrated</em></h3>
+    <table class="grid exu-metrics"><colgroup><col class="exu-c-name"><col><col></colgroup>
+    <thead><tr><th>Row</th><th>Paper</th><th>Twin</th></tr></thead><tbody>
+    <tr><td class="exu-name">mean |S0|</td>${exuSide(exuFmt(PAPER.offlineSet.meanS0), "", false, s0Tip)}${exuSide(exuFmt(view.meanS0), "", true, s0Tip, "calibrated")}</tr>
+    <tr><td class="exu-name">multi %</td>${exuSide(exuFmt(PAPER.offlineSet.multiCandidate.pct), "", false, multiTip)}${exuSide(exuFmt(view.multi), "", true, multiTip, "calibrated")}</tr>
+    </tbody></table>
+    <p class="small-note">The detector bands were fitted to mean |S0|, the multi-candidate rate and the clarifying policies' asked rate by type. Agreement there is by construction.</p>`;
+}
+
+function exuHeadlineBlock(head) {
+  if (!head) return "";
+  return `<p class="small-note">Headline · mean of seeds 1–5 · ${head.ms.toFixed(0)} ms · ε 0 · K ${PARAMS.K} · slip 0.05</p>`
+    + exuCalibrated(head)
+    + exuOfflineTable(head.summary, "headline")
+    + exuTypeTable(head);
 }
 
 function exuLegend(items) {
@@ -199,7 +324,7 @@ function exuChart(id, aria, xName, xLabels, yName, yMin, yMax, yDigits, yTicks, 
   }).join("");
   const dots = series.map((s) => s.values.map((v, i) => {
     if (v == null || !Number.isFinite(v)) return "";
-    const kind = s.dash ? "paper" : "twin (simulated)";
+    const kind = s.dash ? "paper" : "twin (simulated) · out-of-sample";
     return `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(v).toFixed(1)}" r="2.2" style="fill:${s.color};stroke:var(--panel);stroke-width:1;vector-effect:non-scaling-stroke"><title>${exuEsc(s.name)} ${exuEsc(xLabels[i])}: ${exuFmt(v, 3)} · ${kind}</title></circle>`;
   }).join("")).join("");
   return `<svg id="${id}" class="exu-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${exuEsc(aria)}">
@@ -272,22 +397,22 @@ function exuYK(series) {
   return [lo - pad, hi + pad];
 }
 
-function exuCharts(summary, eps, ks) {
+function exuCharts(summary, eps, ks, seed) {
   const qSeries = exuQSeries(summary);
   const eSeries = exuEpsSeries(eps);
   const kSeries = exuKSeries(ks);
   const [kLo, kHi] = exuYK(kSeries);
-  const q = exuChart("exu-chart-q", "Mean questions by initial candidate count. Ideal reference, paper ActivAsk, and the twin clarifying policies.", "|S0|", ["2", "3", "4", "5", "6"], "mean Q", 0, exuYMaxQ(qSeries), 0, 5, qSeries);
-  const e = exuChart("exu-chart-eps", "Accuracy against answer noise. Dashed lines are the paper, solid lines are the twin.", "ε", ["0", ".05", ".10", ".15", ".20"], "accuracy %", exuYEps(eSeries), 100, 0, 6, eSeries);
-  const k = exuChart("exu-chart-k", "Mean minimum proposal G against the number of proposals, for partial and ambiguous instructions.", "K", ["1", "2", "3", "4", "5"], "mean min G", kLo, kHi, 3, 4, kSeries);
-  const eNote = `Dashed is the paper. Solid is the twin (simulated). N = ${eps.n}.`;
-  return `<h3 class="sec-h">Questions by |S0| <em>simulated</em></h3><div class="chart">${q}</div>${exuLegend(qSeries)}
-    <h3 class="sec-h">Accuracy vs eps <em>N ${eps.n}</em></h3><div class="chart">${e}</div>${exuLegend(eSeries)}<p class="small-note">${eNote}</p>
-    <h3 class="sec-h">Minimum G vs K <em>simulated</em></h3><div class="chart">${k}</div>${exuLegend(kSeries)}
-    <p class="small-note">Sweeps use this seed. They stay at K = 4 and slip 0.05. The controls apply to the batch.</p>`;
+  const q = exuChart("exu-chart-q", "Mean questions by initial candidate count. Ideal reference, paper ActivAsk, and the twin clarifying policies. Out-of-sample.", "|S0|", ["2", "3", "4", "5", "6"], "mean Q", 0, exuYMaxQ(qSeries), 0, 5, qSeries);
+  const e = exuChart("exu-chart-eps", "Accuracy against answer noise. Dashed lines are the paper, solid lines are this seed. Out-of-sample.", "ε", ["0", ".05", ".10", ".15", ".20"], "accuracy %", exuYEps(eSeries), 100, 0, 6, eSeries);
+  const k = exuChart("exu-chart-k", "Mean minimum proposal G against the number of proposals, for partial and ambiguous instructions. Out-of-sample.", "K", ["1", "2", "3", "4", "5"], "mean min G", kLo, kHi, 3, 4, kSeries);
+  const eNote = `Out-of-sample. Dashed is the paper. Solid is seed ${seed}. N = ${eps.n}.`;
+  return `<h3 class="sec-h">Questions by |S0| <em>out-of-sample</em></h3><div class="chart">${q}</div>${exuLegend(qSeries)}
+    <h3 class="sec-h">Accuracy vs eps <em>out-of-sample</em></h3><div class="chart">${e}</div>${exuLegend(eSeries)}<p class="small-note">${eNote}</p>
+    <h3 class="sec-h">Minimum G vs K <em>out-of-sample</em></h3><div class="chart">${k}</div>${exuLegend(kSeries)}
+    <p class="small-note">Sweeps use this seed. They stay at K = 4 and slip 0.05. The controls apply to the detail batch.</p>`;
 }
 
-function exuStatus(batch, ms, ctrl) {
+function exuDetailStatus(batch, ms, ctrl) {
   const row = batch.summary.activask || batch.summary.top || batch.summary[Object.keys(batch.summary)[0]];
   const nPol = Object.keys(batch.summary).length;
   const extra = [];
@@ -295,15 +420,18 @@ function exuStatus(batch, ms, ctrl) {
   if (ctrl.K !== PARAMS.K) extra.push(`K ${ctrl.K}`);
   if (Math.abs(ctrl.slip - 0.05) > 1e-9) extra.push(`slip ${ctrl.slip}`);
   const tail = extra.length ? ` · ${extra.join(" · ")}` : "";
-  return `twin (simulated) · ${batch.set} · seed ${batch.seed} · ${nPol}×${row ? row.n : 0} · ${ms.toFixed(0)} ms · mean |S0| ${row ? exuFmt(row.meanS0) : "–"} · multi ${row ? exuFmt(row.multi) : "–"}%${tail}`;
+  const s0 = row ? exuFmt(row.meanS0) : "–";
+  const multi = row ? exuFmt(row.multi) : "–";
+  return `detail · ${batch.set} · seed ${batch.seed} · ${nPol}×${row ? row.n : 0} · ${ms.toFixed(0)} ms · mean |S0| ${s0} calibrated · multi ${multi}% calibrated${tail}`;
 }
 
 function exuPaint() {
   const { batch, ms, ctrl, eps, ks } = exuLast;
-  $("exu-status").textContent = exuStatus(batch, ms, ctrl);
-  const table = batch.set === "online" ? exuOnlineTable(batch.summary) : exuOfflineTable(batch.summary);
-  $("exu-charts").innerHTML = exuCharts(batch.summary, eps, ks);
-  $("exu-tables").innerHTML = table + exuTypeTable(batch.trials);
+  $("exu-status").textContent = exuDetailStatus(batch, ms, ctrl);
+  $("exu-head").innerHTML = exuHeadlineBlock(exuHead);
+  $("exu-charts").innerHTML = exuCharts(batch.summary, eps, ks, batch.seed);
+  const detail = batch.set === "online" ? exuOnlineTable(batch.summary) : exuOfflineTable(batch.summary, "detail");
+  $("exu-tables").innerHTML = detail;
 }
 
 function exuFillTwin(summary) {
@@ -312,7 +440,8 @@ function exuFillTwin(summary) {
     const row = summary[p.id];
     if (!cell || !row) continue;
     cell.textContent = exuFmt(row.acc);
-    cell.title = `Wilson 95% CI ${exuCi(row.ci)} · twin (simulated)`;
+    const range = row.accLo != null ? ` · range ${exuFmt(row.accLo)}–${exuFmt(row.accHi)}` : "";
+    cell.title = `Mean of seeds 1–5 ${exuFmt(row.acc)}${range} · out-of-sample · twin (simulated)`;
   }
 }
 
@@ -360,17 +489,26 @@ function exuCopy() {
   } else fallback();
 }
 
+// Headline is always seeds 1..5 at the paper protocol. It does not follow the controls.
+function exuRunHeadline() {
+  const t0 = performance.now();
+  const batches = EXU_HEAD_SEEDS.map((seed) => runBatch({ set: "offline", seed, eps: 0, K: PARAMS.K, slip: 0.05 }));
+  exuHead = exuAverage(batches);
+  exuHead.ms = performance.now() - t0;
+  exuHead.seeds = EXU_HEAD_SEEDS.slice();
+  exuFillTwin(exuHead.summary);
+}
+
+// One batch at the controls, plus the paper sweeps at that seed. Detail only:
+// an offline or online run does not replace the headline column.
 function exuExecute() {
   const ctrl = exuControls();
   const t0 = performance.now();
   const batch = runBatch({ set: ctrl.set, seed: ctrl.seed, eps: ctrl.eps, K: ctrl.K, slip: ctrl.slip });
-  // The ε and K charts are the paper's sweeps, not the single operating point of the batch.
-  // Same seed, so a re-run moves the batch and both sweeps together.
   const eps = epsSweep({ seed: ctrl.seed });
   const ks = kSweep({ seed: ctrl.seed });
   const ms = performance.now() - t0;
   exuLast = { batch, ms, ctrl, eps, ks };
-  if (batch.set === "offline") exuFillTwin(batch.summary);
   exuPaint();
   $("exu-csv").disabled = false;
 }
@@ -413,6 +551,7 @@ function exuMount() {
     #exp .btn-row { margin-top: 8px; }
     #exp button:disabled { opacity: 0.55; cursor: progress; }
     #exp .sec-h { margin: 9px 0 3px; }
+    #exp .sec-h em { white-space: normal; overflow: visible; text-overflow: clip; }
     #exp table.exu-metrics { table-layout: fixed; font-size: 10.5px; }
     #exp col.exu-c-name { width: 22%; }
     #exp col.exu-c-acc { width: 30%; }
@@ -423,6 +562,8 @@ function exuMount() {
     #exp .exu-p { display: block; color: var(--muted); white-space: nowrap; }
     #exp .exu-t { display: block; color: var(--ink); font-weight: 500; white-space: nowrap; }
     #exp .exu-ci { display: block; color: var(--faint); font-size: 9px; white-space: nowrap; }
+    #exp .exu-tag { display: block; max-width: 100%; font: 7.5px/1.15 var(--mono); font-style: normal; letter-spacing: 0.01em; text-transform: uppercase; color: var(--faint); white-space: normal; overflow-wrap: anywhere; margin-top: 1px; }
+    #exp .exu-cal { color: var(--accent); }
     #report table.grid { table-layout: fixed; width: 100%; font-size: 10.5px; }
     #report table.grid th { white-space: normal; line-height: 1.15; overflow: visible; }
     #report table.grid td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -451,7 +592,9 @@ function exuMount() {
     <button class="btn" id="exu-run" type="button">Run batch</button>
     <button class="btn" id="exu-csv" type="button" disabled>Copy batch CSV</button>
   </div>
-  <p id="exu-status" class="small-note" aria-live="polite">Running the offline batch…</p>
+  <p class="small-note">The controls run one seed. Headline numbers are the mean of seeds 1–5.</p>
+  <p id="exu-status" class="small-note" aria-live="polite">Running seeds 1–5…</p>
+  <div id="exu-head"></div>
   <div id="exu-charts"></div>
   <div id="exu-tables"></div>`;
   $("exu-run").addEventListener("click", () => {
@@ -469,6 +612,9 @@ function exuMount() {
 
 exuMount();
 queueMicrotask(() => {
-  try { exuExecute(); } catch (e) { $("exu-status").textContent = `Batch failed: ${e && e.message ? e.message : e}`; }
+  try {
+    exuRunHeadline();
+    exuExecute();
+  } catch (e) { $("exu-status").textContent = `Batch failed: ${e && e.message ? e.message : e}`; }
   exuRegisterCheck();
 });
