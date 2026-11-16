@@ -12,17 +12,23 @@ function applyTheme() {
 // ---------------------------------------------------------------- camera views. Written in the cell frame (x, y, z up) and
 // converted to three.js scene space: cell (x, y, z) -> scene (x, z, -y).
 const cv = (x, y, z) => V(x, z, -y);
+// Aimed at the real cell: robot base on the -y side, table centred at the origin, head at CAM_POSE.
+// Table sits off the mast axis so the mast is not between the lens and the objects.
+// Head is the head camera: CAM vertical fov, near enough to clip the D435i housing.
 const VIEW_DEFS = {
-  room:   { label: "Room",   pos: [3.2, -3.6, 2.2],   target: [0.0, 0.0, 0.70] },
-  iso:    { label: "Iso",    pos: [1.55, -1.95, 1.65], target: [0.0, -0.20, 0.80] },
-  robot:  { label: "Robot",  pos: [-1.30, -1.10, 1.30], target: [0.0, -0.55, 0.85] },
-  table:  { label: "Table",  pos: [0.0, -0.95, 1.45],  target: [0.0, -0.05, 0.74] },
-  top:    { label: "Top",    pos: [0.0, -0.30, 3.2],   target: [0.0, -0.30, 0.74] },
-  user:   { label: "User",   pos: [0.0, 1.60, 1.55],   target: [0.0, -0.30, 0.85] },
+  room:  { label: "Room",  pos: [2.35, -2.45, 1.90], target: [0.05, -0.05, 0.72] },
+  iso:   { label: "Iso",   pos: [1.72, -2.15, 1.62], target: [0.02, -0.28, 0.58] },
+  robot: { label: "Robot", pos: [-2.25, -0.20, 1.05], target: [0.20, -0.50, 0.70] },
+  table: { label: "Table", pos: [0.62, 1.02, 1.22], target: [-0.02, -0.04, 0.76] },
+  top:   { label: "Top",   pos: [0.02, -0.42, 2.25], target: [0.00, -0.02, 0.74] },
+  user:  { label: "User",  pos: [0.00, 1.48, 1.42], target: [0.00, -0.42, 0.86] },
+  head:  { label: "Head",  pos: [CAM_POSE.pos[0], CAM_POSE.pos[1], CAM_POSE.pos[2]], target: [CAM_POSE.look[0], CAM_POSE.look[1], CAM_POSE.look[2]], fov: CAM.vfov, near: 0.05 },
 };
-const views = Object.fromEntries(Object.entries(VIEW_DEFS).map(([k, v]) => [k, { label: v.label, pos: cv(...v.pos), target: cv(...v.target) }]));
+const views = Object.fromEntries(Object.entries(VIEW_DEFS).map(([k, v]) => [k, {
+  label: v.label, pos: cv(...v.pos), target: cv(...v.target), fov: v.fov || 0, near: v.near || 0,
+}]));
 window.pcViews = views;
-const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6"];   // keys follow the toolbar order
+const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6", "7"];   // keys follow the toolbar order
 {
   const host = $("views");
   Object.entries(views).forEach(([k, v], i) => {
@@ -36,7 +42,10 @@ const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6"];   // keys follow the toolba
 let flight = null;
 function setView(name) {
   const v = views[name]; if (!v) return;
-  if (camera.fov !== 34) { camera.fov = 34; camera.updateProjectionMatrix(); }   // a film fov never sticks to the views
+  const fov = v.fov || 34, near = v.near || 0.01;
+  if (camera.fov !== fov || camera.near !== near) {
+    camera.fov = fov; camera.near = near; camera.updateProjectionMatrix();
+  }
   flight = { t: 0, fromP: camera.position.clone(), fromT: controls.target.clone(), toP: v.pos.clone(), toT: v.target.clone() };
   document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
 }
